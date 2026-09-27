@@ -8,6 +8,21 @@ Microsserviço REST que recebe as especificações técnicas de um projeto audio
 
 > Primeiro de uma série de exercícios que vão incrementar este mesmo projeto ao longo do semestre — a estrutura aqui documentada é a base sobre a qual as próximas entregas serão construídas.
 
+## 📑 Sumário
+
+- [📋 Requisitos](#-requisitos)
+- [🛠 Tecnologias](#-tecnologias)
+- [🚀 Como executar](#-como-executar)
+- [🗂 Estrutura do projeto](#-estrutura-do-projeto)
+- [🏗 Decisão de arquitetura — padrões de projeto aplicados](#-decisão-de-arquitetura--padrões-de-projeto-aplicados)
+- [🖥 Endpoints](#-endpoints)
+- [🔧 Variáveis de ambiente](#-variáveis-de-ambiente)
+- [🧪 Testes](#-testes)
+- [🔩 Scripts de demonstração manual](#-scripts-de-demonstração-manual)
+- [🖥 Compatibilidade](#-compatibilidade)
+- [💾 Persistência de dados](#-persistência-de-dados)
+- [🎯 Conceitos aplicados](#-conceitos-aplicados)
+
 ## 📋 Requisitos
 
 - Node.js (versão LTS)
@@ -60,9 +75,11 @@ Versões: Node.js LTS · TypeScript 5.5 (modo `strict`) · Fastify 4 · TypeORM 
 
 ## 🚀 Como executar
 
+Resumo rápido (pressupõe Node.js LTS e Docker Desktop já instalados e rodando):
+
 ```bash
-git clone <url-do-repositorio>
-cd cinebridge-recomendacao
+git clone https://github.com/SEU_USUARIO/cinebridge-atv1.git
+cd cinebridge-atv1
 npm install
 cp .env.example .env
 docker compose up -d
@@ -70,16 +87,7 @@ npm run seed
 npm run dev
 ```
 
-- Porta padrão do servidor: `3000`.
-- Porta padrão do Postgres: `5432` (mapeada pelo `docker-compose.yml`, lendo o `.env`).
-- Confirme o banco no ar com `docker ps` — deve aparecer `cinebridge-postgres` com `0.0.0.0:5432->5432/tcp`. Se aparecer outra porta, o `.env` não existe ou não foi lido; repita o `cp .env.example .env` e rode `docker compose down && docker compose up -d`.
-- O `npm run seed` popula o banco com projetos e profissionais de exemplo — é necessário rodar ao menos uma vez antes de usar a API.
-
-Teste rápido:
-```bash
-curl http://localhost:3000/health
-```
-Deve retornar `{"status":"ok"}`.
+**Guia completo, passo a passo — com instalação de pré-requisitos, instruções específicas para Ubuntu/WSL2 e solução de problemas comuns**: [docs/execucao.md](docs/execucao.md).
 
 ## 🗂 Estrutura do projeto
 
@@ -182,6 +190,8 @@ Estado atual: **52 testes, 11 suítes, 100% de cobertura de statements/functions
 
 Todos os testes são **unitários**: usam objetos fake/mock e chamam as classes diretamente, sem depender do Postgres — por isso rodam mesmo com o Docker parado. Não há testes de integração validando inserção real no banco (essa cobertura hoje é só manual, via `seed.ts` + verificação da rota).
 
+O roteiro completo dos testes manuais da rota HTTP (requisições, resultado esperado e obtido) e a evidência bruta de cobertura em Windows e Ubuntu está em [docs/testes.md](docs/testes.md).
+
 Entidades de domínio (`domain/entities/`) e arquivos de infraestrutura (`config/`, `server.ts`) são excluídos do cálculo de cobertura (`jest.config.js`) por serem majoritariamente decorators do TypeORM e setup, sem lógica de negócio própria.
 
 ## 🔩 Scripts de demonstração manual
@@ -198,7 +208,7 @@ Diferente dos `*.test.ts` (Jest, mocks, sem banco), esses dois scripts fazem exe
 | Sistema | Situação |
 |---|---|
 | Windows 10+ (desenvolvimento) | Testado ponta a ponta |
-| Ubuntu 24.04+ | Compatível (Docker + Node.js LTS); não testado nesta entrega |
+| Ubuntu 24.04+ | Testado ponta a ponta via WSL2 — instalação, suíte de testes (52/52) e rota HTTP confirmados |
 
 ## 💾 Persistência de dados
 
