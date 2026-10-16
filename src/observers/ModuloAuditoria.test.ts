@@ -1,6 +1,5 @@
 import { ModuloAuditoria } from "./ModuloAuditoria";
-import { EventoRecomendacaoGerada } from "./EventoRecomendacaoGerada";
-import { Publicador } from "./Publicador";
+import { EventoRecomendacao } from "./EventoRecomendacao";
 
 describe("ModuloAuditoria", () => {
   it("registra projeto, papel e quantidade de recomendações", () => {
@@ -10,9 +9,9 @@ describe("ModuloAuditoria", () => {
       projeto: { id: "proj-1" },
       papel: "SONOPLASTA",
       recomendacoes: [{}, {}]
-    } as unknown as EventoRecomendacaoGerada;
+    } as unknown as EventoRecomendacao;
 
-    servico.atualizar({} as Publicador, evento);
+    servico.atualizar(evento);
 
     expect(spy).toHaveBeenCalledWith(expect.stringContaining("proj-1"));
     spy.mockRestore();

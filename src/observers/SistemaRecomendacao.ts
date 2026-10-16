@@ -1,22 +1,22 @@
 import { Publicador } from "./Publicador";
-import { Assinante } from "./Assinante";
-import { EventoRecomendacaoGerada } from "./EventoRecomendacaoGerada";
+import { Observador } from "./Observador";
+import { EventoRecomendacao } from "./EventoRecomendacao";
 
 export class SistemaRecomendacao implements Publicador {
-  private readonly assinantes: Assinante[] = [];
+  private readonly observadores: Observador[] = [];
 
-  adicionarAssinante(assinante: Assinante): void {
-    this.assinantes.push(assinante);
+  adicionarObservador(observador: Observador): void {
+    this.observadores.push(observador);
   }
 
-  removerAssinante(assinante: Assinante): void {
-    const indice = this.assinantes.indexOf(assinante);
-    if (indice >= 0) this.assinantes.splice(indice, 1);
+  removerObservador(observador: Observador): void {
+    const indice = this.observadores.indexOf(observador);
+    if (indice >= 0) this.observadores.splice(indice, 1);
   }
 
-  notificarAssinantes(evento: EventoRecomendacaoGerada): void {
-    for (const assinante of this.assinantes) {
-      assinante.atualizar(this, evento);
+  notificarObservadores(evento: EventoRecomendacao): void {
+    for (const observador of this.observadores) {
+      observador.atualizar(evento);
     }
   }
 }

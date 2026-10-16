@@ -5,18 +5,11 @@ import { Projeto } from "./domain/entities/Projeto";
 import { Profissional } from "./domain/entities/Profissional";
 import { Papel } from "./domain/enums/Papel";
 import { OrquestradorPadrao } from "./orquestrador/OrquestradorPadrao";
-import { PERFIL_IDEAL_PAPEL } from "./config/perfilPapel";
+import { ehCandidatoElegivel } from "./strategies/RecomendadorPorPontuacao";
 import { SistemaRecomendacao } from "./observers/SistemaRecomendacao";
 import { ServicoEmail } from "./observers/ServicoEmail";
 import { ServicoMensagensInternas } from "./observers/ServicoMensagensInternas";
 import { ModuloAuditoria } from "./observers/ModuloAuditoria";
-
-function ehCandidatoElegivel(profissional: Profissional, papel: Papel): boolean {
-  const competenciasDoPapel = new Set(Object.keys(PERFIL_IDEAL_PAPEL[papel]));
-  return (profissional.competencias ?? []).some((v) =>
-    competenciasDoPapel.has(v.competencia.nome)
-  );
-}
 
 async function main(): Promise<void> {
   await AppDataSource.initialize();
@@ -41,9 +34,9 @@ async function main(): Promise<void> {
   }
 
   const publicador = new SistemaRecomendacao();
-  publicador.adicionarAssinante(new ServicoEmail());
-  publicador.adicionarAssinante(new ServicoMensagensInternas());
-  publicador.adicionarAssinante(new ModuloAuditoria());
+  publicador.adicionarObservador(new ServicoEmail());
+  publicador.adicionarObservador(new ServicoMensagensInternas());
+  publicador.adicionarObservador(new ModuloAuditoria());
 
   const orquestrador = new OrquestradorPadrao(undefined, 5, publicador);  //SimilaridadeCosseno
   // const orquestrador = new OrquestradorPadrao(new FiltragemColaborativa());  //FiltragemColaborativa

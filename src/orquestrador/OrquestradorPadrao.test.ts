@@ -5,10 +5,10 @@ import { Profissional } from "../domain/entities/Profissional";
 import { Projeto } from "../domain/entities/Projeto";
 import { Publicador } from "../observers/Publicador";
 import {
-  IRecomendacaoStrategy,
+  PontuacaoStrategy,
   ParametrosRecomendacao,
   ResultadoRecomendacao
-} from "../strategies/IRecomendacaoStrategy";
+} from "../strategies/PontuacaoStrategy";
 
 function criarProfissional(id: string, nome: string): Profissional {
   return { id, nome } as Profissional;
@@ -19,7 +19,7 @@ function criarProjeto(papeisObrigatorios: { papel: Papel; peso: number }[]): Pro
 }
 
 /** Strategy fake: retorna resultados fixos, controlados pelo teste. */
-class StrategyFake implements IRecomendacaoStrategy {
+class StrategyFake implements PontuacaoStrategy {
   readonly nome = "FAKE";
   constructor(private readonly resultadosPorPapel: Map<Papel, ResultadoRecomendacao[]>) {}
 
@@ -30,9 +30,9 @@ class StrategyFake implements IRecomendacaoStrategy {
 
 function criarPublicadorMock(): Publicador {
   return {
-    adicionarAssinante: jest.fn(),
-    removerAssinante: jest.fn(),
-    notificarAssinantes: jest.fn()
+    adicionarObservador: jest.fn(),
+    removerObservador: jest.fn(),
+    notificarObservadores: jest.fn()
   };
 }
 
@@ -129,7 +129,7 @@ describe("OrquestradorPadrao", () => {
 
     orquestrador.orquestrar(projeto, new Map([[Papel.DIRETOR, [alice]]]));
 
-    expect(publicador.notificarAssinantes).toHaveBeenCalledTimes(1);
+    expect(publicador.notificarObservadores).toHaveBeenCalledTimes(1);
   });
 
   it("ignora papel sem candidatos disponíveis, sem gerar recomendação ou convite", () => {

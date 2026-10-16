@@ -1,4 +1,4 @@
-import { IVisitanteProjeto } from "./IVisitanteProjeto";
+import { VisitanteProjeto } from "./VisitanteProjeto";
 import { Projeto } from "../domain/entities/Projeto";
 import { Profissional } from "../domain/entities/Profissional";
 
@@ -7,7 +7,7 @@ import { Profissional } from "../domain/entities/Profissional";
  * dados sem lancar excecao no meio do caminho - acumula tudo em
  * `problemas` pra quem chamou decidir o que fazer (bloquear, logar, etc).
  */
-export class ValidadorConsistencia implements IVisitanteProjeto {
+export class ValidadorConsistencia implements VisitanteProjeto {
   readonly problemas: string[] = [];
 
   visitarProjeto(projeto: Projeto): void {

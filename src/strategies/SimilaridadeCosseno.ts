@@ -1,8 +1,8 @@
 import {
-  IRecomendacaoStrategy,
+  PontuacaoStrategy,
   ParametrosRecomendacao,
   ResultadoRecomendacao
-} from "./IRecomendacaoStrategy";
+} from "./PontuacaoStrategy";
 import { PERFIL_IDEAL_PAPEL } from "../config/perfilPapel";
 import { Profissional } from "../domain/entities/Profissional";
 
@@ -41,7 +41,7 @@ function similaridadeCosseno(
  * Pontuacao normalizada de 0 a 10.
  * responde: "o profissional tem as habilidades técnicas certas pra esse papel?"
  */
-export class SimilaridadeCosseno implements IRecomendacaoStrategy {
+export class SimilaridadeCosseno implements PontuacaoStrategy {
   readonly nome = "SIMILARIDADE_COSSENO";
 
   recomendar(params: ParametrosRecomendacao): ResultadoRecomendacao[] {

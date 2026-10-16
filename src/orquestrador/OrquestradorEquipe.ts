@@ -5,9 +5,9 @@ import { Profissional } from "../domain/entities/Profissional";
 import { Recomendacao } from "../domain/entities/Recomendacao";
 import { Convite } from "../domain/entities/Convite";
 import {
-  IRecomendacaoStrategy,
+  PontuacaoStrategy,
   ResultadoRecomendacao
-} from "../strategies/IRecomendacaoStrategy";
+} from "../strategies/PontuacaoStrategy";
 import { Publicador } from "../observers/Publicador";
 
 export interface ResultadoOrquestracao {
@@ -53,7 +53,7 @@ export abstract class OrquestradorEquipe {
       );
       recomendacoes.push(...novasRecomendacoes);
 
-      this.publicador?.notificarAssinantes({
+      this.publicador?.notificarObservadores({
         projeto,
         papel: papelObrigatorio.papel,
         recomendacoes: novasRecomendacoes
@@ -73,7 +73,7 @@ export abstract class OrquestradorEquipe {
   }
 
   /** Passo variavel: qual strategy usar pra ranquear candidatos desse papel. */
-  protected abstract obterEstrategia(papel: Papel): IRecomendacaoStrategy;
+  protected abstract obterEstrategia(papel: Papel): PontuacaoStrategy;
 
   /** Passo variavel: dado o ranking, qual candidato (se algum) sera convidado. */
   protected abstract selecionarCandidato(

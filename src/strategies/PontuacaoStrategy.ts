@@ -19,7 +19,7 @@ export interface ParametrosRecomendacao {
  * mantendo a mesma assinatura pra ser trocado em tempo de execucao
  * (na criacao do projeto ou por escolha do produtor).
  */
-export interface IRecomendacaoStrategy {
+export interface PontuacaoStrategy {
   readonly nome: string;
   recomendar(params: ParametrosRecomendacao): ResultadoRecomendacao[];
 }

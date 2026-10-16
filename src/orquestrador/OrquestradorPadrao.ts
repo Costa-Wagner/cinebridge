@@ -2,9 +2,9 @@ import { OrquestradorEquipe } from "./OrquestradorEquipe";
 import { Papel } from "../domain/enums/Papel";
 import { Profissional } from "../domain/entities/Profissional";
 import {
-  IRecomendacaoStrategy,
+  PontuacaoStrategy,
   ResultadoRecomendacao
-} from "../strategies/IRecomendacaoStrategy";
+} from "../strategies/PontuacaoStrategy";
 import { SimilaridadeCosseno } from "../strategies/SimilaridadeCosseno";
 import { Publicador } from "../observers/Publicador";
 
@@ -17,14 +17,14 @@ import { Publicador } from "../observers/Publicador";
  */
 export class OrquestradorPadrao extends OrquestradorEquipe {
   constructor(
-    private readonly estrategia: IRecomendacaoStrategy = new SimilaridadeCosseno(),
+    private readonly estrategia: PontuacaoStrategy = new SimilaridadeCosseno(),
     private readonly pontuacaoMinima: number = 5,
     publicador?: Publicador
   ) {
     super(publicador);
   }
 
-  protected obterEstrategia(_papel: Papel): IRecomendacaoStrategy {
+  protected obterEstrategia(_papel: Papel): PontuacaoStrategy {
     return this.estrategia;
   }
 

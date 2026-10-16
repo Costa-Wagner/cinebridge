@@ -176,7 +176,7 @@ async function seedProjeto(): Promise<void> {
       duracaoEstimadaMinutos: 90,
       orcamentoTotal: 50000,
       dataEntrega: "2026-12-01",
-      tipoCaptacao: TipoCaptacao.FICCAO,
+      tipoCaptacao: TipoCaptacao.ANIMACAO,
       localizacaoFilmagem: "Rio de Janeiro",
       papeisObrigatorios: [
         { papel: Papel.DIRETOR, peso: 10 },

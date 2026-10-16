@@ -10,7 +10,7 @@ import { PapelObrigatorio } from "./PapelObrigatorio";
 import { Recomendacao } from "./Recomendacao";
 import { Convite } from "./Convite";
 import type { ElementoVisitavel } from "../../visitors/ElementoVisitavel";
-import type { IVisitanteProjeto } from "../../visitors/IVisitanteProjeto";
+import type { VisitanteProjeto } from "../../visitors/VisitanteProjeto";
 
 @Entity("projetos")
 export class Projeto implements ElementoVisitavel {
@@ -47,7 +47,7 @@ export class Projeto implements ElementoVisitavel {
   @CreateDateColumn()
   criadoEm!: Date;
 
-  aceitar(visitante: IVisitanteProjeto): void {
+  aceitar(visitante: VisitanteProjeto): void {
     visitante.visitarProjeto(this);
   }
 }

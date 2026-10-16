@@ -1,9 +1,8 @@
-import { Assinante } from "./Assinante";
-import { Publicador } from "./Publicador";
-import { EventoRecomendacaoGerada } from "./EventoRecomendacaoGerada";
+import { Observador } from "./Observador";
+import { EventoRecomendacao } from "./EventoRecomendacao";
 
-export class ServicoMensagensInternas implements Assinante {
-  atualizar(_publicador: Publicador, evento: EventoRecomendacaoGerada): void {
+export class ServicoMensagensInternas implements Observador {
+  atualizar(evento: EventoRecomendacao): void {
     console.log(
       `[MENSAGEM_INTERNA] ${evento.recomendacoes.length} profissionais ranqueados para ${evento.papel}`
     );

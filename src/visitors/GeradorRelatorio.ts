@@ -1,4 +1,4 @@
-import { IVisitanteProjeto } from "./IVisitanteProjeto";
+import { VisitanteProjeto } from "./VisitanteProjeto";
 import { Projeto } from "../domain/entities/Projeto";
 import { Profissional } from "../domain/entities/Profissional";
 
@@ -8,7 +8,7 @@ import { Profissional } from "../domain/entities/Profissional";
  * totalmente diferente (texto legivel em vez de validacao/calculo),
  * sem precisar tocar nas entidades Projeto/Profissional.
  */
-export class GeradorRelatorio implements IVisitanteProjeto {
+export class GeradorRelatorio implements VisitanteProjeto {
   private readonly linhas: string[] = [];
 
   visitarProjeto(projeto: Projeto): void {

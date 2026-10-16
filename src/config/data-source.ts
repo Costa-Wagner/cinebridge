@@ -7,6 +7,8 @@ import { ProfissionalCompetencia } from "../domain/entities/ProfissionalCompeten
 import { Avaliacao } from "../domain/entities/Avaliacao";
 import { Recomendacao } from "../domain/entities/Recomendacao";
 import { Convite } from "../domain/entities/Convite";
+import { Equipe } from "../domain/entities/Equipe";
+import { MembroEquipe } from "../domain/entities/MembroEquipe";
 
 export const AppDataSource = new DataSource({
   type: "postgres",
@@ -24,7 +26,9 @@ export const AppDataSource = new DataSource({
     ProfissionalCompetencia,
     Avaliacao,
     Recomendacao,
-    Convite
+    Convite,
+    Equipe,
+    MembroEquipe
   ],
   migrations: ["src/config/migrations/**/*.ts"]
 });

@@ -9,7 +9,7 @@ import { Convite } from "./Convite";
 import { Recomendacao } from "./Recomendacao";
 import { ProfissionalCompetencia } from "./ProfissionalCompetencia";
 import type { ElementoVisitavel } from "../../visitors/ElementoVisitavel";
-import type { IVisitanteProjeto } from "../../visitors/IVisitanteProjeto";
+import type { VisitanteProjeto } from "../../visitors/VisitanteProjeto";
 
 @Entity("profissionais")
 export class Profissional implements ElementoVisitavel {
@@ -46,7 +46,7 @@ export class Profissional implements ElementoVisitavel {
   @OneToMany(() => Recomendacao, (recomendacao) => recomendacao.profissional)
   recomendacoes!: Recomendacao[];
 
-  aceitar(visitante: IVisitanteProjeto): void {
+  aceitar(visitante: VisitanteProjeto): void {
     visitante.visitarProfissional(this);
   }
 }

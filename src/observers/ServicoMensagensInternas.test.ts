@@ -1,6 +1,5 @@
 import { ServicoMensagensInternas } from "./ServicoMensagensInternas";
-import { EventoRecomendacaoGerada } from "./EventoRecomendacaoGerada";
-import { Publicador } from "./Publicador";
+import { EventoRecomendacao } from "./EventoRecomendacao";
 
 describe("ServicoMensagensInternas", () => {
   it("registra a quantidade de profissionais ranqueados", () => {
@@ -9,9 +8,9 @@ describe("ServicoMensagensInternas", () => {
     const evento = {
       papel: "EDITOR",
       recomendacoes: [{}, {}, {}]
-    } as unknown as EventoRecomendacaoGerada;
+    } as unknown as EventoRecomendacao;
 
-    servico.atualizar({} as Publicador, evento);
+    servico.atualizar(evento);
 
     expect(spy).toHaveBeenCalledWith(expect.stringContaining("3"));
     spy.mockRestore();

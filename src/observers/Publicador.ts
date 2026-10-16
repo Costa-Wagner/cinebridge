@@ -1,8 +1,8 @@
-import { Assinante } from "./Assinante";
-import { EventoRecomendacaoGerada } from "./EventoRecomendacaoGerada";
+import { Observador } from "./Observador";
+import { EventoRecomendacao } from "./EventoRecomendacao";
 
 export interface Publicador {
-  adicionarAssinante(assinante: Assinante): void;
-  removerAssinante(assinante: Assinante): void;
-  notificarAssinantes(evento: EventoRecomendacaoGerada): void;
+  adicionarObservador(observador: Observador): void;
+  removerObservador(observador: Observador): void;
+  notificarObservadores(evento: EventoRecomendacao): void;
 }

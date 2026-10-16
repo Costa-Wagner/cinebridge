@@ -1,58 +1,58 @@
 import { SistemaRecomendacao } from "./SistemaRecomendacao";
-import { Assinante } from "./Assinante";
-import { EventoRecomendacaoGerada } from "./EventoRecomendacaoGerada";
+import { Observador } from "./Observador";
+import { EventoRecomendacao } from "./EventoRecomendacao";
 
-function criarAssinanteMock(): Assinante {
+function criarObservadorMock(): Observador {
   return { atualizar: jest.fn() };
 }
 
-function criarEventoFake(): EventoRecomendacaoGerada {
-  return {} as EventoRecomendacaoGerada;
+function criarEventoFake(): EventoRecomendacao {
+  return {} as EventoRecomendacao;
 }
 
 describe("SistemaRecomendacao", () => {
-  it("notifica todos os assinantes cadastrados ao disparar um evento", () => {
+  it("notifica todos os observadores cadastrados ao disparar um evento", () => {
     const publicador = new SistemaRecomendacao();
-    const assinante1 = criarAssinanteMock();
-    const assinante2 = criarAssinanteMock();
-    publicador.adicionarAssinante(assinante1);
-    publicador.adicionarAssinante(assinante2);
+    const observador1 = criarObservadorMock();
+    const observador2 = criarObservadorMock();
+    publicador.adicionarObservador(observador1);
+    publicador.adicionarObservador(observador2);
 
     const evento = criarEventoFake();
-    publicador.notificarAssinantes(evento);
+    publicador.notificarObservadores(evento);
 
-    expect(assinante1.atualizar).toHaveBeenCalledWith(publicador, evento);
-    expect(assinante2.atualizar).toHaveBeenCalledWith(publicador, evento);
+    expect(observador1.atualizar).toHaveBeenCalledWith(evento);
+    expect(observador2.atualizar).toHaveBeenCalledWith(evento);
   });
 
-  it("não notifica um assinante removido", () => {
+  it("não notifica um observador removido", () => {
     const publicador = new SistemaRecomendacao();
-    const assinante = criarAssinanteMock();
-    publicador.adicionarAssinante(assinante);
-    publicador.removerAssinante(assinante);
+    const observador = criarObservadorMock();
+    publicador.adicionarObservador(observador);
+    publicador.removerObservador(observador);
 
-    publicador.notificarAssinantes(criarEventoFake());
+    publicador.notificarObservadores(criarEventoFake());
 
-    expect(assinante.atualizar).not.toHaveBeenCalled();
+    expect(observador.atualizar).not.toHaveBeenCalled();
   });
 
-  it("não quebra ao notificar sem nenhum assinante cadastrado", () => {
+  it("não quebra ao notificar sem nenhum observador cadastrado", () => {
     const publicador = new SistemaRecomendacao();
 
-    expect(() => publicador.notificarAssinantes(criarEventoFake())).not.toThrow();
+    expect(() => publicador.notificarObservadores(criarEventoFake())).not.toThrow();
   });
 
-  it("cada assinante reage de forma independente (falha de um não afeta os outros)", () => {
+  it("cada observador reage de forma independente (falha de um não afeta os outros)", () => {
     const publicador = new SistemaRecomendacao();
-    const assinanteComErro: Assinante = {
+    const observadorComErro: Observador = {
       atualizar: jest.fn(() => {
         throw new Error("falha simulada");
       })
     };
-    const assinanteNormal = criarAssinanteMock();
-    publicador.adicionarAssinante(assinanteComErro);
-    publicador.adicionarAssinante(assinanteNormal);
+    const observadorNormal = criarObservadorMock();
+    publicador.adicionarObservador(observadorComErro);
+    publicador.adicionarObservador(observadorNormal);
 
-    expect(() => publicador.notificarAssinantes(criarEventoFake())).toThrow("falha simulada");
+    expect(() => publicador.notificarObservadores(criarEventoFake())).toThrow("falha simulada");
   });
 }); 
