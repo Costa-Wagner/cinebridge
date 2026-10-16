@@ -5,7 +5,7 @@ function criarEvento(): EventoRecomendacao {
   return {
     projeto: { genero: "Ficção Científica" },
     papel: "DIRETOR",
-    recomendacoes: [{ profissional: { nome: "Ana" }, pontuacao: 9.5 }]
+    candidatos: [{ nome: "Ana" }]
   } as unknown as EventoRecomendacao;
 }
 
@@ -23,7 +23,7 @@ describe("ServicoEmail", () => {
   it("não quebra quando não há nenhuma recomendação", () => {
     const spy = jest.spyOn(console, "log").mockImplementation(() => {});
     const servico = new ServicoEmail();
-    const evento = { ...criarEvento(), recomendacoes: [] } as unknown as EventoRecomendacao;
+    const evento = { ...criarEvento(), candidatos: [] } as unknown as EventoRecomendacao;
 
     expect(() => servico.atualizar(evento)).not.toThrow();
     spy.mockRestore();

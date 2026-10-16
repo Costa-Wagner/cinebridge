@@ -1,9 +1,10 @@
 import { Papel } from "../domain/enums/Papel";
 import { Projeto } from "../domain/entities/Projeto";
-import { Recomendacao } from "../domain/entities/Recomendacao";
+import { Profissional } from "../domain/entities/Profissional";
 
 export interface EventoRecomendacao {
   projeto: Projeto;
   papel: Papel;
-  recomendacoes: Recomendacao[];
+  /** Candidatos ja ranqueados, melhor primeiro. */
+  candidatos: Profissional[];
 }

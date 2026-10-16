@@ -57,3 +57,21 @@ describe("RecomendadorPorPontuacao", () => {
     expect(ranking.get(Papel.DIRETOR)).toEqual([{ profissional: elegivel, pontuacao: 10 }]);
   });
 });
+
+describe("RecomendadorPorPontuacao com pontuacao minima", () => {
+  it("exclui candidatos abaixo da pontuacao minima, mas rankingDetalhado os mantem", () => {
+    const forte = profissional("forte", [competenciaDoDiretor]);
+    const fraco = profissional("fraco", [competenciaDoDiretor]);
+    const pontuador: PontuacaoStrategy = {
+      nome: "FAKE",
+      recomendar: () => [
+        { profissional: forte, pontuacao: 9 },
+        { profissional: fraco, pontuacao: 3 }
+      ]
+    };
+    const recomendador = new RecomendadorPorPontuacao(pontuador, 5);
+
+    expect(recomendador.recomendar(projeto, [forte, fraco]).get(Papel.DIRETOR)).toEqual([forte]);
+    expect(recomendador.rankingDetalhado(projeto, [forte, fraco]).get(Papel.DIRETOR)).toHaveLength(2);
+  });
+});

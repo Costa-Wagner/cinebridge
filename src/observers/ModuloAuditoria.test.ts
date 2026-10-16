@@ -2,13 +2,13 @@ import { ModuloAuditoria } from "./ModuloAuditoria";
 import { EventoRecomendacao } from "./EventoRecomendacao";
 
 describe("ModuloAuditoria", () => {
-  it("registra projeto, papel e quantidade de recomendações", () => {
+  it("registra projeto, papel e quantidade de candidatos", () => {
     const spy = jest.spyOn(console, "log").mockImplementation(() => {});
     const servico = new ModuloAuditoria();
     const evento = {
       projeto: { id: "proj-1" },
       papel: "SONOPLASTA",
-      recomendacoes: [{}, {}]
+      candidatos: [{}, {}]
     } as unknown as EventoRecomendacao;
 
     servico.atualizar(evento);

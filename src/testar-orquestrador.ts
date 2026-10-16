@@ -3,9 +3,9 @@ import "reflect-metadata";
 import { AppDataSource } from "./config/data-source";
 import { Projeto } from "./domain/entities/Projeto";
 import { Profissional } from "./domain/entities/Profissional";
-import { Papel } from "./domain/enums/Papel";
 import { OrquestradorPadrao } from "./orquestrador/OrquestradorPadrao";
-import { ehCandidatoElegivel } from "./strategies/RecomendadorPorPontuacao";
+import { RecomendadorPorPontuacao } from "./strategies/RecomendadorPorPontuacao";
+import { SimilaridadeCosseno } from "./strategies/SimilaridadeCosseno";
 import { SistemaRecomendacao } from "./observers/SistemaRecomendacao";
 import { ServicoEmail } from "./observers/ServicoEmail";
 import { ServicoMensagensInternas } from "./observers/ServicoMensagensInternas";
@@ -23,41 +23,25 @@ async function main(): Promise<void> {
     relations: ["competencias", "competencias.competencia", "avaliacoes", "convites", "convites.projeto"]
   });
   
-  // pra teste: todo profissional e candidato a todo papel obrigatorio,
-  // deixando a strategy discriminar quem realmente encaixa
-   const candidatosPorPapel = new Map<Papel, Profissional[]>();
-  for (const papelObrigatorio of projeto.papeisObrigatorios) {
-    const elegiveis = profissionais.filter((p) =>
-      ehCandidatoElegivel(p, papelObrigatorio.papel)
-    );
-    candidatosPorPapel.set(papelObrigatorio.papel, elegiveis);
-  }
-
   const publicador = new SistemaRecomendacao();
   publicador.adicionarObservador(new ServicoEmail());
   publicador.adicionarObservador(new ServicoMensagensInternas());
   publicador.adicionarObservador(new ModuloAuditoria());
 
-  const orquestrador = new OrquestradorPadrao(undefined, 5, publicador);  //SimilaridadeCosseno
-  // const orquestrador = new OrquestradorPadrao(new FiltragemColaborativa());  //FiltragemColaborativa
+  const orquestrador = new OrquestradorPadrao(publicador);
+  const recomendador = new RecomendadorPorPontuacao(new SimilaridadeCosseno(), 5); // troque a strategy aqui
 
   console.log("\n=== NOTIFICACOES (Observer) ===");
-  const resultado = orquestrador.orquestrar(projeto, candidatosPorPapel);
+  const equipe = orquestrador.orquestrar(projeto, recomendador, profissionais);
 
   console.log("\n=== RANKING POR PAPEL ===");
-  for (const papelObrigatorio of projeto.papeisObrigatorios) {
-    console.log(`\n${papelObrigatorio.papel} (peso ${papelObrigatorio.peso})`);
-    resultado.recomendacoes
-      .filter((r) => r.papel === papelObrigatorio.papel)
-      .forEach((r) =>
-        console.log(`  #${r.posicaoRanking} ${r.profissional.nome} — ${r.pontuacao} (${r.estrategiaUtilizada})`)
-      );
+  for (const [papel, candidatos] of equipe.ranking) {
+    console.log(`\n${papel}`);
+    candidatos.forEach((p, i) => console.log(`  #${i + 1} ${p.nome}`));
   }
 
-  console.log("\n=== CONVITES GERADOS ===");
-  resultado.convites.forEach((c) =>
-    console.log(`  ${c.papel} -> ${c.profissional.nome} [${c.status}]`)
-  );
+  console.log("\n=== EQUIPE PROPOSTA ===");
+  equipe.membros.forEach((m) => console.log(`  ${m.papel} -> ${m.profissional.nome}`));
 
   await AppDataSource.destroy();
 }

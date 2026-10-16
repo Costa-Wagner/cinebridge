@@ -7,7 +7,7 @@ describe("ServicoMensagensInternas", () => {
     const servico = new ServicoMensagensInternas();
     const evento = {
       papel: "EDITOR",
-      recomendacoes: [{}, {}, {}]
+      candidatos: [{}, {}, {}]
     } as unknown as EventoRecomendacao;
 
     servico.atualizar(evento);

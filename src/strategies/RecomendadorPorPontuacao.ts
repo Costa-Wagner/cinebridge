@@ -14,10 +14,15 @@ export function ehCandidatoElegivel(profissional: Profissional, papel: Papel): b
 
 /**
  * Adaptador: encaixa um algoritmo de pontuacao (PontuacaoStrategy, da AV1)
- * no contrato RecomendacaoStrategy do diagrama da AV2.
+ * no contrato RecomendacaoStrategy do diagrama da AV2. Candidatos abaixo da
+ * pontuacao minima ficam fora do resultado (evita sugerir alguem claramente
+ * incompativel so' por ser o "menos pior").
  */
 export class RecomendadorPorPontuacao implements RecomendacaoStrategy {
-  constructor(private readonly pontuador: PontuacaoStrategy) {}
+  constructor(
+    private readonly pontuador: PontuacaoStrategy,
+    private readonly pontuacaoMinima: number = 0
+  ) {}
 
   rankingDetalhado(
     projeto: Projeto,
@@ -34,7 +39,10 @@ export class RecomendadorPorPontuacao implements RecomendacaoStrategy {
   recomendar(projeto: Projeto, profissionais: Profissional[]): Map<Papel, Profissional[]> {
     const resultado = new Map<Papel, Profissional[]>();
     for (const [papel, ranking] of this.rankingDetalhado(projeto, profissionais)) {
-      resultado.set(papel, ranking.map((r) => r.profissional));
+      resultado.set(
+        papel,
+        ranking.filter((r) => r.pontuacao >= this.pontuacaoMinima).map((r) => r.profissional)
+      );
     }
     return resultado;
   }

@@ -4,9 +4,10 @@ import Fastify from "fastify";
 import { AppDataSource } from "./config/data-source";
 import { Projeto } from "./domain/entities/Projeto";
 import { Profissional } from "./domain/entities/Profissional";
-import { Papel } from "./domain/enums/Papel";
 import { OrquestradorPadrao } from "./orquestrador/OrquestradorPadrao";
-import { ehCandidatoElegivel } from "./strategies/RecomendadorPorPontuacao";
+import { RecomendadorPorPontuacao } from "./strategies/RecomendadorPorPontuacao";
+import { SimilaridadeCosseno } from "./strategies/SimilaridadeCosseno";
+import { ProjetoInvalidoError } from "./orquestrador/ProjetoInvalidoError";
 import { SistemaRecomendacao } from "./observers/SistemaRecomendacao";
 import { ServicoEmail } from "./observers/ServicoEmail";
 import { ServicoMensagensInternas } from "./observers/ServicoMensagensInternas";
@@ -28,23 +29,30 @@ app.post<{ Params: { id: string } }>("/projetos/:id/recomendar", async (request,
     relations: ["competencias", "competencias.competencia", "avaliacoes", "convites", "convites.projeto"]
   });
 
-  const candidatosPorPapel = new Map<Papel, Profissional[]>();
-  for (const papelObrigatorio of projeto.papeisObrigatorios) {
-    candidatosPorPapel.set(
-      papelObrigatorio.papel,
-      profissionais.filter((p) => ehCandidatoElegivel(p, papelObrigatorio.papel))
-    );
-  }
-
   const publicador = new SistemaRecomendacao();
   publicador.adicionarObservador(new ServicoEmail());
   publicador.adicionarObservador(new ServicoMensagensInternas());
   publicador.adicionarObservador(new ModuloAuditoria());
 
-  const orquestrador = new OrquestradorPadrao(undefined, 5, publicador);
-  const resultado = orquestrador.orquestrar(projeto, candidatosPorPapel);
+  const orquestrador = new OrquestradorPadrao(publicador);
+  const recomendador = new RecomendadorPorPontuacao(new SimilaridadeCosseno(), 5);
 
-  return reply.send(resultado);
+  try {
+    const equipe = orquestrador.orquestrar(projeto, recomendador, profissionais);
+    const resumo = (p: Profissional) => ({ id: p.id, nome: p.nome });
+    return reply.send({
+      projetoId: projeto.id,
+      equipe: equipe.membros.map((m) => ({ papel: m.papel, profissional: resumo(m.profissional) })),
+      alternativas: Object.fromEntries(
+        [...equipe.ranking].map(([papel, candidatos]) => [papel, candidatos.slice(1).map(resumo)])
+      )
+    });
+  } catch (erro) {
+    if (erro instanceof ProjetoInvalidoError) {
+      return reply.status(422).send({ erro: erro.message });
+    }
+    throw erro;
+  }
 });
 
 async function bootstrap(): Promise<void> {

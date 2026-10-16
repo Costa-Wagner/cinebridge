@@ -9,10 +9,10 @@ import { EventoRecomendacao } from "./EventoRecomendacao";
  */
 export class ServicoEmail implements Observador {
   atualizar(evento: EventoRecomendacao): void {
-    const top = evento.recomendacoes[0];
+    const top = evento.candidatos[0];
     console.log(
       `[EMAIL] Nova recomendacao para o papel ${evento.papel} do projeto "${evento.projeto.genero}": ` +
-        `melhor candidato ${top?.profissional.nome ?? "nenhum"} (${top?.pontuacao ?? "-"})`
+        `melhor candidato ${top?.nome ?? "nenhum"}`
     );
   }
 }

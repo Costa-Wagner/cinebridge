@@ -1,31 +1,31 @@
 import { OrquestradorPadrao } from "./OrquestradorPadrao";
+import { ProjetoInvalidoError } from "./ProjetoInvalidoError";
 import { Papel } from "../domain/enums/Papel";
-import { StatusConvite } from "../domain/enums/StatusConvite";
 import { Profissional } from "../domain/entities/Profissional";
 import { Projeto } from "../domain/entities/Projeto";
 import { Publicador } from "../observers/Publicador";
-import {
-  PontuacaoStrategy,
-  ParametrosRecomendacao,
-  ResultadoRecomendacao
-} from "../strategies/PontuacaoStrategy";
+import { RecomendacaoStrategy } from "../strategies/RecomendacaoStrategy";
 
 function criarProfissional(id: string, nome: string): Profissional {
   return { id, nome } as Profissional;
 }
 
-function criarProjeto(papeisObrigatorios: { papel: Papel; peso: number }[]): Projeto {
-  return { papeisObrigatorios } as Projeto;
+function criarProjeto(
+  papeisObrigatorios: { papel: Papel; peso: number }[],
+  extras: Partial<Projeto> = {}
+): Projeto {
+  return {
+    orcamentoTotal: 50000,
+    duracaoEstimadaMinutos: 90,
+    dataEntrega: "2026-12-01",
+    papeisObrigatorios,
+    ...extras
+  } as Projeto;
 }
 
-/** Strategy fake: retorna resultados fixos, controlados pelo teste. */
-class StrategyFake implements PontuacaoStrategy {
-  readonly nome = "FAKE";
-  constructor(private readonly resultadosPorPapel: Map<Papel, ResultadoRecomendacao[]>) {}
-
-  recomendar(params: ParametrosRecomendacao): ResultadoRecomendacao[] {
-    return this.resultadosPorPapel.get(params.papel) ?? [];
-  }
+/** Strategy fake: devolve rankings fixos, controlados pelo teste. */
+function strategyFake(ranking: Map<Papel, Profissional[]>): RecomendacaoStrategy {
+  return { recomendar: jest.fn().mockReturnValue(ranking) };
 }
 
 function criarPublicadorMock(): Publicador {
@@ -39,107 +39,103 @@ function criarPublicadorMock(): Publicador {
 describe("OrquestradorPadrao", () => {
   const alice = criarProfissional("1", "Alice");
   const bruno = criarProfissional("2", "Bruno");
+  const carla = criarProfissional("3", "Carla");
 
-  it("convida o candidato de maior pontuação quando acima do mínimo", () => {
-    const strategy = new StrategyFake(
+  it("propoe o melhor candidato de cada papel como membro da equipe", () => {
+    const estrategia = strategyFake(
       new Map([
-        [Papel.DIRETOR, [
-          { profissional: alice, pontuacao: 9 },
-          { profissional: bruno, pontuacao: 6 }
-        ]]
+        [Papel.DIRETOR, [alice, bruno]],
+        [Papel.EDITOR, [carla]]
       ])
     );
-    const orquestrador = new OrquestradorPadrao(strategy, 5);
-    const projeto = criarProjeto([{ papel: Papel.DIRETOR, peso: 10 }]);
-
-    const resultado = orquestrador.orquestrar(projeto, new Map([[Papel.DIRETOR, [alice, bruno]]]));
-
-    expect(resultado.convites).toHaveLength(1);
-    expect(resultado.convites[0].profissional).toBe(alice);
-    expect(resultado.convites[0].papel).toBe(Papel.DIRETOR);
-    expect(resultado.convites[0].status).toBe(StatusConvite.PENDENTE);
-  });
-
-  it("não convida ninguém quando a melhor pontuação fica abaixo do mínimo", () => {
-    const strategy = new StrategyFake(
-      new Map([[Papel.DIRETOR, [{ profissional: alice, pontuacao: 3 }]]])
-    );
-    const orquestrador = new OrquestradorPadrao(strategy, 5);
-    const projeto = criarProjeto([{ papel: Papel.DIRETOR, peso: 10 }]);
-
-    const resultado = orquestrador.orquestrar(projeto, new Map([[Papel.DIRETOR, [alice]]]));
-
-    expect(resultado.convites).toHaveLength(0);
-    expect(resultado.recomendacoes).toHaveLength(1);
-  });
-
-  it("não reutiliza o mesmo profissional em dois papéis diferentes", () => {
-    const strategy = new StrategyFake(
-      new Map([
-        [Papel.DIRETOR, [{ profissional: alice, pontuacao: 9 }]],
-        [Papel.EDITOR, [
-          { profissional: alice, pontuacao: 8 },
-          { profissional: bruno, pontuacao: 7 }
-        ]]
-      ])
-    );
-    const orquestrador = new OrquestradorPadrao(strategy, 5);
     const projeto = criarProjeto([
       { papel: Papel.DIRETOR, peso: 10 },
       { papel: Papel.EDITOR, peso: 7 }
     ]);
 
-    const resultado = orquestrador.orquestrar(
-      projeto,
+    const equipe = new OrquestradorPadrao().orquestrar(projeto, estrategia, [alice, bruno, carla]);
+
+    expect(equipe.projeto).toBe(projeto);
+    expect(equipe.membros.map((m) => [m.papel, m.profissional])).toEqual([
+      [Papel.DIRETOR, alice],
+      [Papel.EDITOR, carla]
+    ]);
+    expect(equipe.membros.every((m) => m.aceitouConvite === false)).toBe(true);
+  });
+
+  it("nao reutiliza o mesmo profissional como primeira opcao de dois papeis", () => {
+    const estrategia = strategyFake(
       new Map([
         [Papel.DIRETOR, [alice]],
         [Papel.EDITOR, [alice, bruno]]
       ])
     );
+    const projeto = criarProjeto([
+      { papel: Papel.DIRETOR, peso: 10 },
+      { papel: Papel.EDITOR, peso: 7 }
+    ]);
 
-    expect(resultado.convites).toHaveLength(2);
-    const convitadoEditor = resultado.convites.find((c) => c.papel === Papel.EDITOR);
-    expect(convitadoEditor?.profissional).toBe(bruno);
+    const equipe = new OrquestradorPadrao().orquestrar(projeto, estrategia, [alice, bruno]);
+
+    expect(equipe.membros.find((m) => m.papel === Papel.EDITOR)?.profissional).toBe(bruno);
+    expect(equipe.ranking.get(Papel.EDITOR)).toEqual([bruno]);
   });
 
-  it("gera recomendações com posicaoRanking sequencial e nome da estratégia", () => {
-    const strategy = new StrategyFake(
-      new Map([[Papel.DIRETOR, [
-        { profissional: alice, pontuacao: 9 },
-        { profissional: bruno, pontuacao: 6 }
-      ]]])
-    );
-    const orquestrador = new OrquestradorPadrao(strategy, 5);
+  it("limita o ranking de cada papel ao limite configurado", () => {
+    const estrategia = strategyFake(new Map([[Papel.DIRETOR, [alice, bruno, carla]]]));
     const projeto = criarProjeto([{ papel: Papel.DIRETOR, peso: 10 }]);
 
-    const resultado = orquestrador.orquestrar(projeto, new Map([[Papel.DIRETOR, [alice, bruno]]]));
+    const equipe = new OrquestradorPadrao(undefined, 2).orquestrar(projeto, estrategia, [alice, bruno, carla]);
 
-    expect(resultado.recomendacoes[0].posicaoRanking).toBe(1);
-    expect(resultado.recomendacoes[1].posicaoRanking).toBe(2);
-    expect(resultado.recomendacoes.every((r) => r.estrategiaUtilizada === "FAKE")).toBe(true);
+    expect(equipe.ranking.get(Papel.DIRETOR)).toEqual([alice, bruno]);
   });
 
-  it("notifica o publicador uma vez por papel processado", () => {
-    const strategy = new StrategyFake(
-      new Map([[Papel.DIRETOR, [{ profissional: alice, pontuacao: 9 }]]])
+  it("papel sem candidatos fica sem membro e sem notificacao", () => {
+    const estrategia = strategyFake(
+      new Map([
+        [Papel.DIRETOR, [alice]],
+        [Papel.SONOPLASTA, []]
+      ])
     );
     const publicador = criarPublicadorMock();
-    const orquestrador = new OrquestradorPadrao(strategy, 5, publicador);
-    const projeto = criarProjeto([{ papel: Papel.DIRETOR, peso: 10 }]);
+    const projeto = criarProjeto([
+      { papel: Papel.DIRETOR, peso: 10 },
+      { papel: Papel.SONOPLASTA, peso: 6 }
+    ]);
 
-    orquestrador.orquestrar(projeto, new Map([[Papel.DIRETOR, [alice]]]));
+    const equipe = new OrquestradorPadrao(publicador).orquestrar(projeto, estrategia, [alice]);
 
+    expect(equipe.membros.map((m) => m.papel)).toEqual([Papel.DIRETOR]);
     expect(publicador.notificarObservadores).toHaveBeenCalledTimes(1);
+    expect(publicador.notificarObservadores).toHaveBeenCalledWith({
+      projeto,
+      papel: Papel.DIRETOR,
+      candidatos: [alice]
+    });
   });
 
-  it("ignora papel sem candidatos disponíveis, sem gerar recomendação ou convite", () => {
-    const strategy = new StrategyFake(new Map());
-    const orquestrador = new OrquestradorPadrao(strategy, 5);
-    const projeto = criarProjeto([{ papel: Papel.SONOPLASTA, peso: 6 }]);
+  it("remove profissionais duplicados antes de chamar a strategy", () => {
+    const estrategia = strategyFake(new Map());
+    const projeto = criarProjeto([{ papel: Papel.DIRETOR, peso: 10 }]);
 
-    const resultado = orquestrador.orquestrar(projeto, new Map());
+    new OrquestradorPadrao().orquestrar(projeto, estrategia, [alice, alice, bruno]);
 
-    expect(resultado.recomendacoes).toHaveLength(0);
-    expect(resultado.convites).toHaveLength(0);
+    expect(estrategia.recomendar).toHaveBeenCalledWith(projeto, [alice, bruno]);
+  });
+
+  it.each([
+    ["orcamento zerado", { orcamentoTotal: 0 }],
+    ["duracao zerada", { duracaoEstimadaMinutos: 0 }],
+    ["data de entrega invalida", { dataEntrega: "nao-e-data" }],
+    ["nenhum papel obrigatorio", { papeisObrigatorios: [] }],
+    ["papel com peso zero", { papeisObrigatorios: [{ papel: Papel.DIRETOR, peso: 0 }] }]
+  ])("rejeita projeto invalido (%s) sem chamar a strategy", (_motivo, extras) => {
+    const estrategia = strategyFake(new Map());
+    const projeto = criarProjeto([{ papel: Papel.DIRETOR, peso: 10 }], extras as Partial<Projeto>);
+
+    expect(() => new OrquestradorPadrao().orquestrar(projeto, estrategia, [alice])).toThrow(
+      ProjetoInvalidoError
+    );
+    expect(estrategia.recomendar).not.toHaveBeenCalled();
   });
 });

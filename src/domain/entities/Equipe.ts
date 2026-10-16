@@ -8,6 +8,8 @@ import {
 } from "typeorm";
 import { Projeto } from "./Projeto";
 import { MembroEquipe } from "./MembroEquipe";
+import { Profissional } from "./Profissional";
+import { Papel } from "../enums/Papel";
 
 @Entity("equipes")
 export class Equipe {
@@ -23,4 +25,7 @@ export class Equipe {
 
   @CreateDateColumn()
   criadaEm!: Date;
+
+  /** Nao persistido: ranking completo por papel (o primeiro de cada lista e' o membro proposto). */
+  ranking!: Map<Papel, Profissional[]>;
 }
