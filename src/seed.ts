@@ -5,9 +5,8 @@ import { Competencia } from "./domain/entities/Competencia";
 import { Profissional } from "./domain/entities/Profissional";
 import { ProfissionalCompetencia } from "./domain/entities/ProfissionalCompetencia";
 import { Avaliacao } from "./domain/entities/Avaliacao";
-import { Projeto } from "./domain/entities/Projeto";
+import { ProjetoAnimacao } from "./domain/entities/ProjetoAnimacao";
 import { Papel } from "./domain/enums/Papel";
-import { TipoCaptacao } from "./domain/enums/TipoCaptacao";
 
 interface CompetenciaSeed {
   nome: string;
@@ -169,14 +168,15 @@ async function seedProfissionais(competencias: Map<string, Competencia>): Promis
 }
 
 async function seedProjeto(): Promise<void> {
-  const repo = AppDataSource.getRepository(Projeto);
+  const repo = AppDataSource.getRepository(ProjetoAnimacao);
   await repo.save(
     repo.create({
       genero: "Ficção Científica",
       duracaoEstimadaMinutos: 90,
       orcamentoTotal: 50000,
       dataEntrega: "2026-12-01",
-      tipoCaptacao: TipoCaptacao.ANIMACAO,
+      softwareModelagem: "Blender",
+      metricasRenderizacao: ["tempo por quadro", "custo de render farm"],
       localizacaoFilmagem: "Rio de Janeiro",
       papeisObrigatorios: [
         { papel: Papel.DIRETOR, peso: 10 },
