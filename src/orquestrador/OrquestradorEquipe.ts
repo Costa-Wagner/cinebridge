@@ -5,6 +5,8 @@ import { Equipe } from "../domain/entities/Equipe";
 import { MembroEquipe } from "../domain/entities/MembroEquipe";
 import { RecomendacaoStrategy } from "../strategies/RecomendacaoStrategy";
 import { Publicador } from "../observers/Publicador";
+import { Observador } from "../observers/Observador";
+import { FabricaProjeto } from "../fabricas/FabricaProjeto";
 import { ProjetoInvalidoError } from "./ProjetoInvalidoError";
 
 /**
@@ -13,11 +15,22 @@ import { ProjetoInvalidoError } from "./ProjetoInvalidoError";
  * as etapas variaveis as subclasses. O template nao pode ser sobrescrito:
  * o construtor recusa subclasses que tentem substitui-lo.
  *
- * Premissa: o diagrama nao mostra a origem dos profissionais, entao a
- * lista de disponiveis e' entregue pelo chamador (rota/servico).
+ * A fabrica do tipo de projeto fornece validador, recomendador e notificador,
+ * entao o orquestrador nunca decide nada com base no tipo do projeto.
+ *
+ * Premissas: o diagrama nao mostra a origem dos profissionais, entao a
+ * lista de disponiveis e' entregue pelo chamador (rota/servico); e a
+ * `estrategia` e' opcional: por padrao vem da fabrica, mas pode ser trocada
+ * sem trocar de fabrica.
  */
 export abstract class OrquestradorEquipe {
-  protected constructor(private readonly publicador?: Publicador) {
+  private readonly notificador: Observador;
+
+  protected constructor(
+    protected readonly fabrica: FabricaProjeto,
+    private readonly publicador?: Publicador
+  ) {
+    this.notificador = fabrica.criarNotificador();
     if (this.orquestrar !== OrquestradorEquipe.prototype.orquestrar) {
       throw new Error("orquestrar() e' o template method e nao pode ser sobrescrito");
     }
@@ -25,8 +38,8 @@ export abstract class OrquestradorEquipe {
 
   public orquestrar(
     projeto: Projeto,
-    estrategia: RecomendacaoStrategy,
-    profissionais: Profissional[]
+    profissionais: Profissional[],
+    estrategia: RecomendacaoStrategy = this.fabrica.criarRecomendador()
   ): Equipe {
     if (!this.validarRestricoes(projeto)) {
       throw new ProjetoInvalidoError();
@@ -48,11 +61,17 @@ export abstract class OrquestradorEquipe {
     recomendacoes: Map<Papel, Profissional[]>
   ): Map<Papel, Profissional[]>;
 
-  /** Passo fixo: um evento por papel que tenha ao menos um candidato. */
+  /**
+   * Passo fixo: um evento por papel que tenha ao menos um candidato. O
+   * notificador da fabrica e' sempre avisado, sem alterar a lista de
+   * observadores do publicador (que pode ser compartilhado).
+   */
   private notificar(projeto: Projeto, recomendacoes: Map<Papel, Profissional[]>): void {
     for (const [papel, candidatos] of recomendacoes) {
       if (candidatos.length > 0) {
-        this.publicador?.notificarObservadores({ projeto, papel, candidatos });
+        const evento = { projeto, papel, candidatos };
+        this.notificador.atualizar(evento);
+        this.publicador?.notificarObservadores(evento);
       }
     }
   }

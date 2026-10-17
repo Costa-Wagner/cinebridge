@@ -5,8 +5,11 @@ import { AppDataSource } from "./config/data-source";
 import { Projeto } from "./domain/entities/Projeto";
 import { Profissional } from "./domain/entities/Profissional";
 import { OrquestradorPadrao } from "./orquestrador/OrquestradorPadrao";
-import { RecomendadorPorPontuacao } from "./strategies/RecomendadorPorPontuacao";
-import { SimilaridadeCosseno } from "./strategies/SimilaridadeCosseno";
+import { FabricaProjeto } from "./fabricas/FabricaProjeto";
+import { FabricaDocumentario } from "./fabricas/documentario/FabricaDocumentario";
+import { FabricaAnimacao } from "./fabricas/animacao/FabricaAnimacao";
+import { FabricaPublicitario } from "./fabricas/publicitario/FabricaPublicitario";
+import { TipoCaptacao } from "./domain/enums/TipoCaptacao";
 import { ProjetoInvalidoError } from "./orquestrador/ProjetoInvalidoError";
 import { SistemaRecomendacao } from "./observers/SistemaRecomendacao";
 import { ServicoEmail } from "./observers/ServicoEmail";
@@ -14,6 +17,13 @@ import { ServicoMensagensInternas } from "./observers/ServicoMensagensInternas";
 import { ModuloAuditoria } from "./observers/ModuloAuditoria";
 
 const app = Fastify({ logger: true });
+
+// Provisorio: a selecao da fabrica por tipo passa para o SistemaRecomendacao no passo 5.
+const FABRICAS = new Map<TipoCaptacao, FabricaProjeto>([
+  [TipoCaptacao.DOCUMENTARIO, new FabricaDocumentario()],
+  [TipoCaptacao.ANIMACAO, new FabricaAnimacao()],
+  [TipoCaptacao.PUBLICITARIO, new FabricaPublicitario()]
+]);
 
 app.get("/health", async () => ({ status: "ok" }));
 
@@ -34,11 +44,14 @@ app.post<{ Params: { id: string } }>("/projetos/:id/recomendar", async (request,
   publicador.adicionarObservador(new ServicoMensagensInternas());
   publicador.adicionarObservador(new ModuloAuditoria());
 
-  const orquestrador = new OrquestradorPadrao(publicador);
-  const recomendador = new RecomendadorPorPontuacao(new SimilaridadeCosseno(), 5);
+  const fabrica = FABRICAS.get(projeto.tipoCaptacao);
+  if (!fabrica) {
+    return reply.status(422).send({ erro: `Tipo de projeto sem fabrica: ${projeto.tipoCaptacao}` });
+  }
+  const orquestrador = new OrquestradorPadrao(fabrica, publicador);
 
   try {
-    const equipe = orquestrador.orquestrar(projeto, recomendador, profissionais);
+    const equipe = orquestrador.orquestrar(projeto, profissionais);
     const resumo = (p: Profissional) => ({ id: p.id, nome: p.nome });
     return reply.send({
       projetoId: projeto.id,

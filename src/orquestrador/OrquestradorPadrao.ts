@@ -3,30 +3,27 @@ import { Papel } from "../domain/enums/Papel";
 import { Projeto } from "../domain/entities/Projeto";
 import { Profissional } from "../domain/entities/Profissional";
 import { Publicador } from "../observers/Publicador";
+import { FabricaProjeto } from "../fabricas/FabricaProjeto";
 
 /**
  * Implementacao padrao das etapas variaveis:
- * - valida orcamento, duracao, prazo (data valida) e papeis com peso;
+ * - valida o projeto com o validador da fabrica (consistencia geral e
+ *   regras do tipo, incluindo recusar projeto de outro tipo);
  * - remove profissionais duplicados;
  * - nao repete o mesmo profissional como primeira opcao de dois papeis
  *   e limita o ranking de cada papel a `limite` candidatos.
  */
 export class OrquestradorPadrao extends OrquestradorEquipe {
   constructor(
+    fabrica: FabricaProjeto,
     publicador?: Publicador,
     private readonly limite: number = 5
   ) {
-    super(publicador);
+    super(fabrica, publicador);
   }
 
   protected validarRestricoes(projeto: Projeto): boolean {
-    return (
-      Number(projeto.orcamentoTotal) > 0 &&
-      projeto.duracaoEstimadaMinutos > 0 &&
-      !Number.isNaN(Date.parse(projeto.dataEntrega)) &&
-      projeto.papeisObrigatorios.length > 0 &&
-      projeto.papeisObrigatorios.every((p) => p.peso > 0)
-    );
+    return projeto.aceitar(this.fabrica.criarValidador()) === true;
   }
 
   protected normalizarDados(_projeto: Projeto, profissionais: Profissional[]): Profissional[] {

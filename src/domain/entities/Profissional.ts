@@ -46,7 +46,7 @@ export class Profissional implements ElementoVisitavel {
   @OneToMany(() => Recomendacao, (recomendacao) => recomendacao.profissional)
   recomendacoes!: Recomendacao[];
 
-  aceitar(visitante: VisitanteProjeto): void {
-    visitante.visitarProfissional(this);
+  aceitar(visitante: VisitanteProjeto): any {
+    return visitante.visitarProfissional(this);
   }
 }

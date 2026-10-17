@@ -55,8 +55,8 @@ export class Projeto implements ElementoVisitavel {
   @CreateDateColumn()
   criadoEm!: Date;
 
-  aceitar(visitante: VisitanteProjeto): void {
-    visitante.visitarProjeto(this);
+  aceitar(visitante: VisitanteProjeto): any {
+    return visitante.visitarProjeto(this);
   }
 
   /**

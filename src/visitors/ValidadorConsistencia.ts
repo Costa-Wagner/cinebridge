@@ -10,7 +10,8 @@ import { Profissional } from "../domain/entities/Profissional";
 export class ValidadorConsistencia implements VisitanteProjeto {
   readonly problemas: string[] = [];
 
-  visitarProjeto(projeto: Projeto): void {
+  visitarProjeto(projeto: Projeto): boolean {
+    const antes = this.problemas.length;
     if (projeto.orcamentoTotal <= 0) {
       this.problemas.push(`Projeto ${projeto.id}: orcamento total deve ser positivo`);
     }
@@ -31,9 +32,11 @@ export class ValidadorConsistencia implements VisitanteProjeto {
     if (Number.isNaN(new Date(projeto.dataEntrega).getTime())) {
       this.problemas.push(`Projeto ${projeto.id}: data de entrega invalida`);
     }
+    return this.problemas.length === antes;
   }
 
-  visitarProfissional(profissional: Profissional): void {
+  visitarProfissional(profissional: Profissional): boolean {
+    const antes = this.problemas.length;
     if (profissional.precoBaseDiaria <= 0) {
       this.problemas.push(`Profissional ${profissional.id}: preco base diaria deve ser positivo`);
     }
@@ -43,5 +46,6 @@ export class ValidadorConsistencia implements VisitanteProjeto {
     if (!profissional.disponibilidade || profissional.disponibilidade.length === 0) {
       this.problemas.push(`Profissional ${profissional.id}: nenhuma janela de disponibilidade`);
     }
+    return this.problemas.length === antes;
   }
 }

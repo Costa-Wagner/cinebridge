@@ -4,6 +4,8 @@ import { Papel } from "../domain/enums/Papel";
 import { Profissional } from "../domain/entities/Profissional";
 import { Projeto } from "../domain/entities/Projeto";
 import { RecomendacaoStrategy } from "../strategies/RecomendacaoStrategy";
+import { FabricaProjeto } from "../fabricas/FabricaProjeto";
+import { FabricaDocumentario } from "../fabricas/documentario/FabricaDocumentario";
 
 const projeto = {
   orcamentoTotal: 1000,
@@ -13,11 +15,12 @@ const projeto = {
 } as Projeto;
 
 const ana = { id: "1", nome: "Ana" } as Profissional;
+const fabricaFake = { criarNotificador: () => ({ atualizar: () => {} }) } as unknown as FabricaProjeto;
 
 /** Subclasse que registra a ordem em que o template chama cada etapa. */
 class OrquestradorEspiao extends OrquestradorEquipe {
   constructor(public readonly chamadas: string[], private readonly valido = true) {
-    super();
+    super(fabricaFake);
   }
   protected validarRestricoes(): boolean {
     this.chamadas.push("validarRestricoes");
@@ -43,7 +46,7 @@ describe("OrquestradorEquipe (Template Method)", () => {
       }
     };
 
-    new OrquestradorEspiao(chamadas).orquestrar(projeto, estrategia, [ana]);
+    new OrquestradorEspiao(chamadas).orquestrar(projeto, [ana], estrategia);
 
     expect(chamadas).toEqual(["validarRestricoes", "normalizarDados", "recomendar", "posProcessar"]);
   });
@@ -52,7 +55,7 @@ describe("OrquestradorEquipe (Template Method)", () => {
     const chamadas: string[] = [];
     const estrategia: RecomendacaoStrategy = { recomendar: jest.fn() };
 
-    expect(() => new OrquestradorEspiao(chamadas, false).orquestrar(projeto, estrategia, [ana])).toThrow();
+    expect(() => new OrquestradorEspiao(chamadas, false).orquestrar(projeto, [ana], estrategia)).toThrow();
 
     expect(chamadas).toEqual(["validarRestricoes"]);
   });
@@ -67,8 +70,17 @@ describe("OrquestradorEquipe (Template Method)", () => {
       }
     }
 
-    const padrao = new OrquestradorPadrao().orquestrar(projeto, estrategia, [ana]);
-    const vazio = new SemRanking().orquestrar(projeto, estrategia, [ana]);
+    const fabrica = new FabricaDocumentario();
+    const valido = fabrica.criarProjeto({
+      duracaoEstimadaMinutos: 60,
+      orcamentoTotal: 1000,
+      dataEntrega: "2026-12-01",
+      tema: "Rios",
+      entrevistados: ["Ana"]
+    });
+
+    const padrao = new OrquestradorPadrao(fabrica).orquestrar(valido, [ana], estrategia);
+    const vazio = new SemRanking(fabrica).orquestrar(valido, [ana], estrategia);
 
     expect(padrao.membros).toHaveLength(1);
     expect(vazio.membros).toHaveLength(0);
@@ -81,6 +93,6 @@ describe("OrquestradorEquipe (Template Method)", () => {
       }
     }
 
-    expect(() => new Violador()).toThrow("nao pode ser sobrescrito");
+    expect(() => new Violador(new FabricaDocumentario())).toThrow("nao pode ser sobrescrito");
   });
 });
