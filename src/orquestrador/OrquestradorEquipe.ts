@@ -7,6 +7,9 @@ import { RecomendacaoStrategy } from "../strategies/RecomendacaoStrategy";
 import { Publicador } from "../observers/Publicador";
 import { Observador } from "../observers/Observador";
 import { FabricaProjeto } from "../fabricas/FabricaProjeto";
+import { TipoEvento } from "../observers/TipoEvento";
+import { EventoRecomendacao } from "../observers/EventoRecomendacao";
+import { StatusEquipe } from "../domain/enums/StatusEquipe";
 import { ProjetoInvalidoError } from "./ProjetoInvalidoError";
 
 /**
@@ -19,9 +22,10 @@ import { ProjetoInvalidoError } from "./ProjetoInvalidoError";
  * entao o orquestrador nunca decide nada com base no tipo do projeto.
  *
  * Premissas: o diagrama nao mostra a origem dos profissionais, entao a
- * lista de disponiveis e' entregue pelo chamador (rota/servico); e a
+ * lista de disponiveis e' entregue pelo chamador (rota/servico); a
  * `estrategia` e' opcional: por padrao vem da fabrica, mas pode ser trocada
- * sem trocar de fabrica.
+ * sem trocar de fabrica; e `papeis` (opcional) limita a rodada de
+ * recomendacao a alguns papeis, usado ao substituir um membro.
  */
 export abstract class OrquestradorEquipe {
   private readonly notificador: Observador;
@@ -39,13 +43,15 @@ export abstract class OrquestradorEquipe {
   public orquestrar(
     projeto: Projeto,
     profissionais: Profissional[],
-    estrategia: RecomendacaoStrategy = this.fabrica.criarRecomendador()
+    estrategia: RecomendacaoStrategy = this.fabrica.criarRecomendador(),
+    papeis?: Papel[]
   ): Equipe {
     if (!this.validarRestricoes(projeto)) {
       throw new ProjetoInvalidoError();
     }
     const disponiveis = this.normalizarDados(projeto, profissionais);
-    const recomendacoes = this.posProcessar(estrategia.recomendar(projeto, disponiveis));
+    const alvo = papeis ? this.restringirPapeis(projeto, papeis) : projeto;
+    const recomendacoes = this.posProcessar(estrategia.recomendar(alvo, disponiveis));
     this.notificar(projeto, recomendacoes);
     return this.montarEquipe(projeto, recomendacoes);
   }
@@ -69,11 +75,28 @@ export abstract class OrquestradorEquipe {
   private notificar(projeto: Projeto, recomendacoes: Map<Papel, Profissional[]>): void {
     for (const [papel, candidatos] of recomendacoes) {
       if (candidatos.length > 0) {
-        const evento = { projeto, papel, candidatos };
-        this.notificador.atualizar(evento);
+        const evento: EventoRecomendacao = {
+          tipo: TipoEvento.RECOMENDACAO_GERADA,
+          projeto,
+          papel,
+          candidatos
+        };
+        try {
+          this.notificador.atualizar(evento);
+        } catch (erro) {
+          console.error("[ORQUESTRADOR] notificador da fabrica falhou:", erro);
+        }
         this.publicador?.notificarObservadores(evento);
       }
     }
+  }
+
+  /** Visao do projeto so' com os papeis pedidos; vale apenas para a strategy (validacao e eventos usam o projeto real). */
+  private restringirPapeis(projeto: Projeto, papeis: Papel[]): Projeto {
+    const visao = projeto.clonar();
+    visao.id = projeto.id;
+    visao.papeisObrigatorios = projeto.papeisObrigatorios.filter((p) => papeis.includes(p.papel as Papel));
+    return visao;
   }
 
   /** Passo fixo: o primeiro de cada papel vira membro proposto; o ranking completo fica na equipe. */
@@ -81,6 +104,8 @@ export abstract class OrquestradorEquipe {
     const equipe = new Equipe();
     equipe.projeto = projeto;
     equipe.ranking = recomendacoes;
+    equipe.status = StatusEquipe.EM_FORMACAO;
+    equipe.formadaEm = null;
     equipe.membros = [];
     for (const [papel, candidatos] of recomendacoes) {
       if (candidatos.length === 0) continue;

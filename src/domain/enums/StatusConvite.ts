@@ -1,5 +1,6 @@
 export enum StatusConvite {
   PENDENTE = "PENDENTE",
   ACEITO = "ACEITO",
-  RECUSADO = "RECUSADO"
+  RECUSADO = "RECUSADO",
+  CANCELADO = "CANCELADO"
 }

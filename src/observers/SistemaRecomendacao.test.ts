@@ -52,7 +52,26 @@ describe("SistemaRecomendacao", () => {
     const observadorNormal = criarObservadorMock();
     publicador.adicionarObservador(observadorComErro);
     publicador.adicionarObservador(observadorNormal);
+    const erro = jest.spyOn(console, "error").mockImplementation(() => {});
 
-    expect(() => publicador.notificarObservadores(criarEventoFake())).toThrow("falha simulada");
+    expect(() => publicador.notificarObservadores(criarEventoFake())).not.toThrow();
+
+    expect(observadorNormal.atualizar).toHaveBeenCalledTimes(1);
+    expect(erro).toHaveBeenCalledWith(expect.stringContaining("falhou"), expect.any(Error));
+    erro.mockRestore();
+  });
+
+  it("o observador que falha nao impede os seguintes, mesmo quando e' o primeiro", () => {
+    const publicador = new SistemaRecomendacao();
+    const ordem: string[] = [];
+    publicador.adicionarObservador({ atualizar: () => { ordem.push("a"); throw new Error("x"); } });
+    publicador.adicionarObservador({ atualizar: () => { ordem.push("b"); } });
+    publicador.adicionarObservador({ atualizar: () => { ordem.push("c"); } });
+    const erro = jest.spyOn(console, "error").mockImplementation(() => {});
+
+    publicador.notificarObservadores(criarEventoFake());
+
+    expect(ordem).toEqual(["a", "b", "c"]);
+    erro.mockRestore();
   });
 }); 

@@ -6,6 +6,7 @@ import { TipoSemFabricaError } from "../fabricas/TipoSemFabricaError";
 import { OrquestradorPadrao } from "../orquestrador/OrquestradorPadrao";
 import { ProjetoInvalidoError } from "../orquestrador/ProjetoInvalidoError";
 import { TipoCaptacao } from "../domain/enums/TipoCaptacao";
+import { Papel } from "../domain/enums/Papel";
 import { Projeto } from "../domain/entities/Projeto";
 import { Profissional } from "../domain/entities/Profissional";
 import { Equipe } from "../domain/entities/Equipe";
@@ -46,12 +47,18 @@ export class SistemaRecomendacao implements Publicador {
   }
 
   /** Seleciona a fabrica pelo tipo do projeto e orquestra a equipe. */
-  recomendar(projeto: Projeto, profissionais: Profissional[], estrategia?: RecomendacaoStrategy): Equipe {
+  recomendar(
+    projeto: Projeto,
+    profissionais: Profissional[],
+    estrategia?: RecomendacaoStrategy,
+    papeis?: Papel[]
+  ): Equipe {
     const fabrica = this.obterFabrica(projeto.tipoCaptacao);
     return new OrquestradorPadrao(fabrica, this, this.limiteCandidatos).orquestrar(
       projeto,
       profissionais,
-      estrategia
+      estrategia,
+      papeis
     );
   }
 
@@ -65,8 +72,13 @@ export class SistemaRecomendacao implements Publicador {
   }
 
   notificarObservadores(evento: EventoRecomendacao): void {
-    for (const observador of this.observadores) {
-      observador.atualizar(evento);
+    // Um observador com falha nao impede os demais de reagir.
+    for (const observador of [...this.observadores]) {
+      try {
+        observador.atualizar(evento);
+      } catch (erro) {
+        console.error(`[OBSERVER] ${observador.constructor.name} falhou ao tratar ${evento.tipo}:`, erro);
+      }
     }
   }
 }

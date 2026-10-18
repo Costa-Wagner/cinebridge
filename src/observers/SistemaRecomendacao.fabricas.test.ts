@@ -11,6 +11,7 @@ import { TipoCaptacao } from "../domain/enums/TipoCaptacao";
 import { Papel } from "../domain/enums/Papel";
 import { Profissional } from "../domain/entities/Profissional";
 import { RecomendacaoStrategy } from "../strategies/RecomendacaoStrategy";
+import { TipoEvento } from "./TipoEvento";
 
 const base = { duracaoEstimadaMinutos: 90, orcamentoTotal: 50000, dataEntrega: "2026-12-01" };
 const alice = { id: "1", nome: "Alice" } as Profissional;
@@ -91,7 +92,7 @@ describe("SistemaRecomendacao: selecao de fabrica por tipo", () => {
     const equipe = sistema.recomendar(projeto, [alice], estrategia);
 
     expect(equipe.membros.map((m) => m.profissional)).toEqual([alice]);
-    expect(observador.atualizar).toHaveBeenCalledWith({ projeto, papel: Papel.DIRETOR, candidatos: [alice] });
+    expect(observador.atualizar).toHaveBeenCalledWith({ tipo: TipoEvento.RECOMENDACAO_GERADA, projeto, papel: Papel.DIRETOR, candidatos: [alice] });
   });
 
   it("aplica o limite de candidatos configurado no sistema", () => {
