@@ -3,20 +3,16 @@ import "reflect-metadata";
 import { AppDataSource } from "./config/data-source";
 import { Projeto } from "./domain/entities/Projeto";
 import { Profissional } from "./domain/entities/Profissional";
-import { Papel } from "./domain/enums/Papel";
 import { OrquestradorPadrao } from "./orquestrador/OrquestradorPadrao";
-import { PERFIL_IDEAL_PAPEL } from "./config/perfilPapel";
+import { FabricaProjeto } from "./fabricas/FabricaProjeto";
+import { FabricaDocumentario } from "./fabricas/documentario/FabricaDocumentario";
+import { FabricaAnimacao } from "./fabricas/animacao/FabricaAnimacao";
+import { FabricaPublicitario } from "./fabricas/publicitario/FabricaPublicitario";
+import { TipoCaptacao } from "./domain/enums/TipoCaptacao";
 import { SistemaRecomendacao } from "./observers/SistemaRecomendacao";
 import { ServicoEmail } from "./observers/ServicoEmail";
 import { ServicoMensagensInternas } from "./observers/ServicoMensagensInternas";
 import { ModuloAuditoria } from "./observers/ModuloAuditoria";
-
-function ehCandidatoElegivel(profissional: Profissional, papel: Papel): boolean {
-  const competenciasDoPapel = new Set(Object.keys(PERFIL_IDEAL_PAPEL[papel]));
-  return (profissional.competencias ?? []).some((v) =>
-    competenciasDoPapel.has(v.competencia.nome)
-  );
-}
 
 async function main(): Promise<void> {
   await AppDataSource.initialize();
@@ -30,41 +26,29 @@ async function main(): Promise<void> {
     relations: ["competencias", "competencias.competencia", "avaliacoes", "convites", "convites.projeto"]
   });
   
-  // pra teste: todo profissional e candidato a todo papel obrigatorio,
-  // deixando a strategy discriminar quem realmente encaixa
-   const candidatosPorPapel = new Map<Papel, Profissional[]>();
-  for (const papelObrigatorio of projeto.papeisObrigatorios) {
-    const elegiveis = profissionais.filter((p) =>
-      ehCandidatoElegivel(p, papelObrigatorio.papel)
-    );
-    candidatosPorPapel.set(papelObrigatorio.papel, elegiveis);
-  }
-
   const publicador = new SistemaRecomendacao();
-  publicador.adicionarAssinante(new ServicoEmail());
-  publicador.adicionarAssinante(new ServicoMensagensInternas());
-  publicador.adicionarAssinante(new ModuloAuditoria());
+  publicador.adicionarObservador(new ServicoEmail());
+  publicador.adicionarObservador(new ServicoMensagensInternas());
+  publicador.adicionarObservador(new ModuloAuditoria());
 
-  const orquestrador = new OrquestradorPadrao(undefined, 5, publicador);  //SimilaridadeCosseno
-  // const orquestrador = new OrquestradorPadrao(new FiltragemColaborativa());  //FiltragemColaborativa
+  const fabricas = new Map<TipoCaptacao, FabricaProjeto>([
+    [TipoCaptacao.DOCUMENTARIO, new FabricaDocumentario()],
+    [TipoCaptacao.ANIMACAO, new FabricaAnimacao()],
+    [TipoCaptacao.PUBLICITARIO, new FabricaPublicitario()]
+  ]);
+  const orquestrador = new OrquestradorPadrao(fabricas.get(projeto.tipoCaptacao)!, publicador);
 
   console.log("\n=== NOTIFICACOES (Observer) ===");
-  const resultado = orquestrador.orquestrar(projeto, candidatosPorPapel);
+  const equipe = orquestrador.orquestrar(projeto, profissionais) // 3o parametro opcional: troca a strategy;
 
   console.log("\n=== RANKING POR PAPEL ===");
-  for (const papelObrigatorio of projeto.papeisObrigatorios) {
-    console.log(`\n${papelObrigatorio.papel} (peso ${papelObrigatorio.peso})`);
-    resultado.recomendacoes
-      .filter((r) => r.papel === papelObrigatorio.papel)
-      .forEach((r) =>
-        console.log(`  #${r.posicaoRanking} ${r.profissional.nome} — ${r.pontuacao} (${r.estrategiaUtilizada})`)
-      );
+  for (const [papel, candidatos] of equipe.ranking) {
+    console.log(`\n${papel}`);
+    candidatos.forEach((p, i) => console.log(`  #${i + 1} ${p.nome}`));
   }
 
-  console.log("\n=== CONVITES GERADOS ===");
-  resultado.convites.forEach((c) =>
-    console.log(`  ${c.papel} -> ${c.profissional.nome} [${c.status}]`)
-  );
+  console.log("\n=== EQUIPE PROPOSTA ===");
+  equipe.membros.forEach((m) => console.log(`  ${m.papel} -> ${m.profissional.nome}`));
 
   await AppDataSource.destroy();
 }

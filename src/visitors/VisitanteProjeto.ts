@@ -7,7 +7,7 @@ import type { Profissional } from "../domain/entities/Profissional";
  * concreta dessa interface, sem precisar alterar as entidades a cada
  * nova operacao.
  */
-export interface IVisitanteProjeto {
-  visitarProjeto(projeto: Projeto): void;
-  visitarProfissional(profissional: Profissional): void;
+export interface VisitanteProjeto {
+  visitarProjeto(projeto: Projeto): any;
+  visitarProfissional(profissional: Profissional): any;
 }

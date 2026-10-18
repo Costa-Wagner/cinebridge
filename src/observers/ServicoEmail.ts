@@ -1,6 +1,5 @@
-import { Assinante } from "./Assinante";
-import { Publicador } from "./Publicador";
-import { EventoRecomendacaoGerada } from "./EventoRecomendacaoGerada";
+import { Observador } from "./Observador";
+import { EventoRecomendacao } from "./EventoRecomendacao";
 
 /**
  * Em producao dispararia um email real (ex: pro produtor do projeto).
@@ -8,12 +7,12 @@ import { EventoRecomendacaoGerada } from "./EventoRecomendacaoGerada";
  * de extensao (substituir o corpo de `atualizar`) e' o que importa
  * pra demonstrar o desacoplamento do Observer.
  */
-export class ServicoEmail implements Assinante {
-  atualizar(_publicador: Publicador, evento: EventoRecomendacaoGerada): void {
-    const top = evento.recomendacoes[0];
+export class ServicoEmail implements Observador {
+  atualizar(evento: EventoRecomendacao): void {
+    const top = evento.candidatos[0];
     console.log(
       `[EMAIL] Nova recomendacao para o papel ${evento.papel} do projeto "${evento.projeto.genero}": ` +
-        `melhor candidato ${top?.profissional.nome ?? "nenhum"} (${top?.pontuacao ?? "-"})`
+        `melhor candidato ${top?.nome ?? "nenhum"}`
     );
   }
 }

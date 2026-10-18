@@ -1,8 +1,8 @@
 import {
-  IRecomendacaoStrategy,
+  PontuacaoStrategy,
   ParametrosRecomendacao,
   ResultadoRecomendacao
-} from "./IRecomendacaoStrategy";
+} from "./PontuacaoStrategy";
 import { Profissional } from "../domain/entities/Profissional";
 import { Projeto } from "../domain/entities/Projeto";
 
@@ -23,7 +23,7 @@ function estaDisponivel(profissional: Profissional, projeto: Projeto): boolean {
  * nao depende de historico nem de vetores de competencia - e' a
  * opcao pra quando o produtor quer priorizar viabilidade financeira.
  */
-export class RegrasOrcamento implements IRecomendacaoStrategy {
+export class RegrasOrcamento implements PontuacaoStrategy {
   readonly nome = "REGRAS_ORCAMENTO";
 
   recomendar(params: ParametrosRecomendacao): ResultadoRecomendacao[] {

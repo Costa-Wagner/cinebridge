@@ -1,5 +1,5 @@
-import type { IVisitanteProjeto } from "./IVisitanteProjeto";
+import type { VisitanteProjeto } from "./VisitanteProjeto";
 
 export interface ElementoVisitavel {
-  aceitar(visitante: IVisitanteProjeto): void;
+  aceitar(visitante: VisitanteProjeto): any;
 }

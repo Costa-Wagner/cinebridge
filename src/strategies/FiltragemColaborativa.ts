@@ -1,8 +1,8 @@
 import {
-  IRecomendacaoStrategy,
+  PontuacaoStrategy,
   ParametrosRecomendacao,
   ResultadoRecomendacao
-} from "./IRecomendacaoStrategy";
+} from "./PontuacaoStrategy";
 import { StatusConvite } from "../domain/enums/StatusConvite";
 import { Profissional } from "../domain/entities/Profissional";
 
@@ -34,7 +34,7 @@ function afinidadeGenero(profissional: Profissional, genero: string): number {
  * recomendou bem esse profissional pra esse tipo de projeto").
  * responde: "esse profissional entrega um trabalho bom, historicamente?"
  */
-export class FiltragemColaborativa implements IRecomendacaoStrategy {
+export class FiltragemColaborativa implements PontuacaoStrategy {
   readonly nome = "FILTRAGEM_COLABORATIVA";
 
   recomendar(params: ParametrosRecomendacao): ResultadoRecomendacao[] {

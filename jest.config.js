@@ -3,6 +3,7 @@ module.exports = {
   preset: "ts-jest",
   testEnvironment: "node",
   testMatch: ["**/*.test.ts"],
+  testPathIgnorePatterns: ["/node_modules/", "\\.integration\\.test\\.ts$"],
   collectCoverageFrom: [
     "src/**/*.ts",
     "!src/**/*.test.ts",
@@ -11,7 +12,9 @@ module.exports = {
     "!src/seed.ts",
     "!src/testar-orquestrador.ts",
     "!src/testar-visitors.ts",
-    "!src/domain/entities/**"
+    "!src/domain/entities/**",
+    "!src/integracao/**",
+    "!src/composicao.ts"
   ],
   coverageThreshold: {
     global: {

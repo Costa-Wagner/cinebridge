@@ -12,7 +12,8 @@
     "test:visitors": "node -r ts-node/register src/testar-visitors.ts",
     "test": "jest",
     "test:coverage": "jest --coverage",
-    "typeorm": "typeorm-ts-node-commonjs"
+    "typeorm": "typeorm-ts-node-commonjs",
+    "test:integration": "jest --config jest.integration.config.js --runInBand"
   },
   "dependencies": {
     "dotenv": "^16.4.5",

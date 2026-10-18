@@ -7,6 +7,11 @@ import { ProfissionalCompetencia } from "../domain/entities/ProfissionalCompeten
 import { Avaliacao } from "../domain/entities/Avaliacao";
 import { Recomendacao } from "../domain/entities/Recomendacao";
 import { Convite } from "../domain/entities/Convite";
+import { ProjetoDocumentario } from "../domain/entities/ProjetoDocumentario";
+import { ProjetoAnimacao } from "../domain/entities/ProjetoAnimacao";
+import { ProjetoPublicitario } from "../domain/entities/ProjetoPublicitario";
+import { Equipe } from "../domain/entities/Equipe";
+import { MembroEquipe } from "../domain/entities/MembroEquipe";
 
 export const AppDataSource = new DataSource({
   type: "postgres",
@@ -19,12 +24,17 @@ export const AppDataSource = new DataSource({
   logging: false,
   entities: [
     Projeto,
+    ProjetoDocumentario,
+    ProjetoAnimacao,
+    ProjetoPublicitario,
     Profissional,
     Competencia,
     ProfissionalCompetencia,
     Avaliacao,
     Recomendacao,
-    Convite
+    Convite,
+    Equipe,
+    MembroEquipe
   ],
   migrations: ["src/config/migrations/**/*.ts"]
 });

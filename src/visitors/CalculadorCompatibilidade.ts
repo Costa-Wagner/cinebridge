@@ -1,4 +1,4 @@
-import { IVisitanteProjeto } from "./IVisitanteProjeto";
+import { VisitanteProjeto } from "./VisitanteProjeto";
 import { Projeto } from "../domain/entities/Projeto";
 import { Profissional } from "../domain/entities/Profissional";
 
@@ -17,7 +17,7 @@ interface IndicadoresProfissional {
  * Calcula indicadores agregados sobre a arvore, sem alterar as entidades
  * visitadas - guarda os resultados internamente, indexados por id.
  */
-export class CalculadorCompatibilidade implements IVisitanteProjeto {
+export class CalculadorCompatibilidade implements VisitanteProjeto {
   readonly indicadoresProjetos = new Map<string, IndicadoresProjeto>();
   readonly indicadoresProfissionais = new Map<string, IndicadoresProfissional>();
 
