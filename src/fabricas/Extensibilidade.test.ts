@@ -10,6 +10,7 @@ import { Projeto } from "../domain/entities/Projeto";
 import { Profissional } from "../domain/entities/Profissional";
 import { TipoCaptacao } from "../domain/enums/TipoCaptacao";
 import { Papel } from "../domain/enums/Papel";
+import { TipoEvento } from "../observers/TipoEvento";
 
 /**
  * Um tipo de projeto novo (realidade virtual), definido so aqui no teste:
@@ -78,7 +79,7 @@ describe("novo tipo de projeto sem alterar o orquestrador (Abstract Factory)", (
 
     expect(projeto).toBeInstanceOf(ProjetoRealidadeVirtual);
     expect(equipe.membros.map((m) => [m.papel, m.profissional])).toEqual([[Papel.DIRETOR, ana]]);
-    expect(notificadorRV.atualizar).toHaveBeenCalledWith({ projeto, papel: Papel.DIRETOR, candidatos: [ana] });
+    expect(notificadorRV.atualizar).toHaveBeenCalledWith({ tipo: TipoEvento.RECOMENDACAO_GERADA, projeto, papel: Papel.DIRETOR, candidatos: [ana] });
   });
 
   it("o validador do novo tipo aplica as proprias regras", () => {

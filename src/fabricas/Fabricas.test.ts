@@ -19,6 +19,7 @@ import { TipoCaptacao } from "../domain/enums/TipoCaptacao";
 import { Profissional } from "../domain/entities/Profissional";
 import { EventoRecomendacao } from "../observers/EventoRecomendacao";
 import { PontuacaoStrategy } from "../strategies/PontuacaoStrategy";
+import { TipoEvento } from "../observers/TipoEvento";
 
 const base = { duracaoEstimadaMinutos: 90, orcamentoTotal: 50000, dataEntrega: "2026-12-01" };
 const papeisDe = (p: { papeisObrigatorios: { papel: Papel }[] }) => p.papeisObrigatorios.map((x) => x.papel);
@@ -97,7 +98,7 @@ describe("Familia Documentario", () => {
 
   it("notificador descreve o tema e os entrevistados", () => {
     const saida = jest.fn();
-    const evento = { projeto: valido, papel: Papel.DIRETOR, candidatos: [{}, {}] } as unknown as EventoRecomendacao;
+    const evento = { tipo: TipoEvento.RECOMENDACAO_GERADA, projeto: valido, papel: Papel.DIRETOR, candidatos: [{}, {}] } as unknown as EventoRecomendacao;
 
     new NotificadorDocumentario(saida).atualizar(evento);
 
@@ -109,7 +110,7 @@ describe("Familia Documentario", () => {
     const spy = jest.spyOn(console, "log").mockImplementation(() => {});
     const projeto = { tema: "T" } as unknown as ProjetoDocumentario;
 
-    new NotificadorDocumentario().atualizar({ projeto, papel: Papel.EDITOR, candidatos: [] });
+    new NotificadorDocumentario().atualizar({ tipo: TipoEvento.RECOMENDACAO_GERADA, projeto, papel: Papel.EDITOR, candidatos: [] });
 
     expect(spy).toHaveBeenCalledWith(expect.stringContaining("0 entrevistado(s)"));
     spy.mockRestore();
@@ -151,7 +152,7 @@ describe("Familia Animacao", () => {
 
   it("notificador inclui as metricas de renderizacao", () => {
     const saida = jest.fn();
-    const evento = { projeto: valido, papel: Papel.EDITOR, candidatos: [{}] } as unknown as EventoRecomendacao;
+    const evento = { tipo: TipoEvento.RECOMENDACAO_GERADA, projeto: valido, papel: Papel.EDITOR, candidatos: [{}] } as unknown as EventoRecomendacao;
 
     new NotificadorAnimacao(saida).atualizar(evento);
 
@@ -162,7 +163,7 @@ describe("Familia Animacao", () => {
     const spy = jest.spyOn(console, "log").mockImplementation(() => {});
     const projeto = { softwareModelagem: "Blender" } as unknown as ProjetoAnimacao;
 
-    new NotificadorAnimacao().atualizar({ projeto, papel: Papel.EDITOR, candidatos: [] });
+    new NotificadorAnimacao().atualizar({ tipo: TipoEvento.RECOMENDACAO_GERADA, projeto, papel: Papel.EDITOR, candidatos: [] });
 
     expect(spy).toHaveBeenCalledWith(expect.stringContaining("nenhuma"));
     spy.mockRestore();
@@ -243,7 +244,7 @@ describe("Familia Publicitario", () => {
 
   it("notificador informa cliente e canal", () => {
     const saida = jest.fn();
-    const evento = { projeto: valido, papel: Papel.DIRETOR, candidatos: [{}] } as unknown as EventoRecomendacao;
+    const evento = { tipo: TipoEvento.RECOMENDACAO_GERADA, projeto: valido, papel: Papel.DIRETOR, candidatos: [{}] } as unknown as EventoRecomendacao;
 
     new NotificadorPublicitario(saida).atualizar(evento);
 
@@ -254,7 +255,7 @@ describe("Familia Publicitario", () => {
   it("notificador usa console.log por padrao", () => {
     const spy = jest.spyOn(console, "log").mockImplementation(() => {});
 
-    new NotificadorPublicitario().atualizar({ projeto: valido, papel: Papel.EDITOR, candidatos: [] });
+    new NotificadorPublicitario().atualizar({ tipo: TipoEvento.RECOMENDACAO_GERADA, projeto: valido, papel: Papel.EDITOR, candidatos: [] });
 
     expect(spy).toHaveBeenCalled();
     spy.mockRestore();

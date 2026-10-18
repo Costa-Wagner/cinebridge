@@ -1,8 +1,10 @@
 import { ServicoEmail } from "./ServicoEmail";
 import { EventoRecomendacao } from "./EventoRecomendacao";
+import { TipoEvento } from "./TipoEvento";
 
 function criarEvento(): EventoRecomendacao {
   return {
+    tipo: TipoEvento.RECOMENDACAO_GERADA,
     projeto: { genero: "Ficção Científica" },
     papel: "DIRETOR",
     candidatos: [{ nome: "Ana" }]

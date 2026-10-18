@@ -9,6 +9,7 @@ import { FabricaDocumentario } from "../fabricas/documentario/FabricaDocumentari
 import { FabricaAnimacao } from "../fabricas/animacao/FabricaAnimacao";
 import { FabricaPublicitario } from "../fabricas/publicitario/FabricaPublicitario";
 import { DadosProjeto } from "../fabricas/FabricaProjeto";
+import { TipoEvento } from "../observers/TipoEvento";
 
 const fabrica = new FabricaDocumentario();
 
@@ -130,6 +131,7 @@ describe("OrquestradorPadrao", () => {
     expect(equipe.membros.map((m) => m.papel)).toEqual([Papel.DIRETOR]);
     expect(publicador.notificarObservadores).toHaveBeenCalledTimes(1);
     expect(publicador.notificarObservadores).toHaveBeenCalledWith({
+      tipo: TipoEvento.RECOMENDACAO_GERADA,
       projeto,
       papel: Papel.DIRETOR,
       candidatos: [alice]
@@ -206,9 +208,49 @@ describe("OrquestradorPadrao com fabricas diferentes (Abstract Factory)", () => 
     new OrquestradorPadrao(new FabricaComEspiao()).orquestrar(documentario, [alice], estrategia);
 
     expect(notificador.atualizar).toHaveBeenCalledWith({
+      tipo: TipoEvento.RECOMENDACAO_GERADA,
       projeto: documentario,
       papel: Papel.DIRETOR,
       candidatos: [alice]
     });
+  });
+
+  it("falha no notificador da fabrica nao interrompe a orquestracao nem os observadores", () => {
+    const publicador = criarPublicadorMock();
+    class FabricaQueFalha extends FabricaDocumentario {
+      criarNotificador() {
+        return { atualizar: () => { throw new Error("notificador fora do ar"); } } as never;
+      }
+    }
+    const erro = jest.spyOn(console, "error").mockImplementation(() => {});
+    const estrategia = strategyFake(new Map([[Papel.DIRETOR, [alice]]]));
+
+    const equipe = new OrquestradorPadrao(new FabricaQueFalha(), publicador).orquestrar(
+      documentario,
+      [alice],
+      estrategia
+    );
+
+    expect(equipe.membros).toHaveLength(1);
+    expect(publicador.notificarObservadores).toHaveBeenCalledTimes(1);
+    expect(erro).toHaveBeenCalled();
+    erro.mockRestore();
+  });
+
+  it("papeis restringem a rodada: a strategy so' enxerga os papeis pedidos, o projeto real e' preservado", () => {
+    const estrategia = strategyFake(new Map([[Papel.EDITOR, [alice]]]));
+
+    const equipe = new OrquestradorPadrao(new FabricaDocumentario()).orquestrar(
+      documentario,
+      [alice],
+      estrategia,
+      [Papel.EDITOR]
+    );
+
+    const visao = (estrategia.recomendar as jest.Mock).mock.calls[0][0];
+    expect(visao.papeisObrigatorios.map((p: { papel: Papel }) => p.papel)).toEqual([Papel.EDITOR]);
+    expect(visao).not.toBe(documentario);
+    expect(equipe.projeto).toBe(documentario);
+    expect(documentario.papeisObrigatorios.length).toBeGreaterThan(1);
   });
 });
