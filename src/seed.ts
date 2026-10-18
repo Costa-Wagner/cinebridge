@@ -1,5 +1,6 @@
 import "dotenv/config";
 import "reflect-metadata";
+import { DataSource } from "typeorm";
 import { AppDataSource } from "./config/data-source";
 import { Competencia } from "./domain/entities/Competencia";
 import { Profissional } from "./domain/entities/Profissional";
@@ -115,17 +116,17 @@ const PROFISSIONAIS_SEED: ProfissionalSeed[] = [
   }
 ];
 
-async function limparBanco(): Promise<void> {
-  await AppDataSource.query(
+async function limparBanco(ds: DataSource): Promise<void> {
+  await ds.query(
     `TRUNCATE TABLE "convites", "recomendacoes", "profissional_competencias", "avaliacoes", "competencias", "profissionais", "projetos" RESTART IDENTITY CASCADE`
   );
 }
 
-async function seedCompetencias(): Promise<Map<string, Competencia>> {
+async function seedCompetencias(ds: DataSource): Promise<Map<string, Competencia>> {
   const nomes = new Set(
     PROFISSIONAIS_SEED.flatMap((p) => p.competencias.map((c) => c.nome))
   );
-  const repo = AppDataSource.getRepository(Competencia);
+  const repo = ds.getRepository(Competencia);
   const mapa = new Map<string, Competencia>();
 
   for (const nome of nomes) {
@@ -136,10 +137,10 @@ async function seedCompetencias(): Promise<Map<string, Competencia>> {
   return mapa;
 }
 
-async function seedProfissionais(competencias: Map<string, Competencia>): Promise<void> {
-  const profissionalRepo = AppDataSource.getRepository(Profissional);
-  const vinculoRepo = AppDataSource.getRepository(ProfissionalCompetencia);
-  const avaliacaoRepo = AppDataSource.getRepository(Avaliacao);
+async function seedProfissionais(ds: DataSource, competencias: Map<string, Competencia>): Promise<void> {
+  const profissionalRepo = ds.getRepository(Profissional);
+  const vinculoRepo = ds.getRepository(ProfissionalCompetencia);
+  const avaliacaoRepo = ds.getRepository(Avaliacao);
 
   for (const dado of PROFISSIONAIS_SEED) {
     const profissional = await profissionalRepo.save(
@@ -167,9 +168,9 @@ async function seedProfissionais(competencias: Map<string, Competencia>): Promis
   }
 }
 
-async function seedProjeto(): Promise<void> {
-  const repo = AppDataSource.getRepository(ProjetoAnimacao);
-  await repo.save(
+async function seedProjeto(ds: DataSource): Promise<ProjetoAnimacao> {
+  const repo = ds.getRepository(ProjetoAnimacao);
+  return repo.save(
     repo.create({
       genero: "Ficção Científica",
       duracaoEstimadaMinutos: 90,
@@ -190,20 +191,26 @@ async function seedProjeto(): Promise<void> {
   );
 }
 
+/** Recria os dados de exemplo no DataSource informado (ja inicializado). */
+export async function executarSeed(ds: DataSource): Promise<{ projeto: ProjetoAnimacao }> {
+  await limparBanco(ds);
+  const competencias = await seedCompetencias(ds);
+  await seedProfissionais(ds, competencias);
+  const projeto = await seedProjeto(ds);
+  return { projeto };
+}
+
 async function main(): Promise<void> {
   await AppDataSource.initialize();
-  await limparBanco();
-
-  const competencias = await seedCompetencias();
-  await seedProfissionais(competencias);
-  await seedProjeto();
-
+  await executarSeed(AppDataSource);
   console.log("Seed concluido: 1 projeto, 6 profissionais, competencias e avaliacoes.");
   await AppDataSource.destroy();
 }
 
-main().catch(async (err) => {
-  console.error("Erro no seed:", err);
-  await AppDataSource.destroy();
-  process.exit(1);
-});
+if (require.main === module) {
+  main().catch(async (err) => {
+    console.error("Erro no seed:", err);
+    await AppDataSource.destroy();
+    process.exit(1);
+  });
+}

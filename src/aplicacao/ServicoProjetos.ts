@@ -35,10 +35,16 @@ export class ServicoProjetos {
     return equipe;
   }
 
+  /** Membros na mesma ordem dos papeis do projeto (o banco nao garante ordem). */
   async buscarEquipe(projetoId: string): Promise<Equipe | null> {
-    return this.dataSource.getRepository(Equipe).findOne({
+    const equipe = await this.dataSource.getRepository(Equipe).findOne({
       where: { projeto: { id: projetoId } },
-      relations: ["membros", "membros.profissional"]
+      relations: ["projeto", "membros", "membros.profissional"]
     });
+    if (equipe) {
+      const ordem = equipe.projeto.papeisObrigatorios.map((p) => p.papel as string);
+      equipe.membros.sort((a, b) => ordem.indexOf(a.papel) - ordem.indexOf(b.papel));
+    }
+    return equipe;
   }
 }
