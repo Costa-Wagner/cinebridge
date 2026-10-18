@@ -6,10 +6,10 @@ export class ValidadorPublicitario extends ValidadorPorTipo<ProjetoPublicitario>
 
   protected validarEspecifico(projeto: ProjetoPublicitario): void {
     if (!projeto.cliente?.trim()) {
-      this.problemas.push(`Projeto ${projeto.id}: projeto publicitario exige cliente`);
+      this.problemas.push(`${this.rotulo(projeto)}: projeto publicitario exige cliente`);
     }
     if (!projeto.canal?.trim()) {
-      this.problemas.push(`Projeto ${projeto.id}: projeto publicitario exige canal`);
+      this.problemas.push(`${this.rotulo(projeto)}: projeto publicitario exige canal`);
     }
   }
 }

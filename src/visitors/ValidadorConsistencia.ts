@@ -10,27 +10,31 @@ import { Profissional } from "../domain/entities/Profissional";
 export class ValidadorConsistencia implements VisitanteProjeto {
   readonly problemas: string[] = [];
 
+  protected rotulo(projeto: Projeto): string {
+    return `Projeto ${projeto.id ?? "(novo)"}`;
+  }
+
   visitarProjeto(projeto: Projeto): boolean {
     const antes = this.problemas.length;
     if (projeto.orcamentoTotal <= 0) {
-      this.problemas.push(`Projeto ${projeto.id}: orcamento total deve ser positivo`);
+      this.problemas.push(`${this.rotulo(projeto)}: orcamento total deve ser positivo`);
     }
     if (projeto.duracaoEstimadaMinutos <= 0) {
-      this.problemas.push(`Projeto ${projeto.id}: duracao estimada deve ser positiva`);
+      this.problemas.push(`${this.rotulo(projeto)}: duracao estimada deve ser positiva`);
     }
     if (!projeto.papeisObrigatorios || projeto.papeisObrigatorios.length === 0) {
-      this.problemas.push(`Projeto ${projeto.id}: nenhum papel obrigatorio definido`);
+      this.problemas.push(`${this.rotulo(projeto)}: nenhum papel obrigatorio definido`);
     } else {
       for (const p of projeto.papeisObrigatorios) {
         if (p.peso < 0 || p.peso > 10) {
           this.problemas.push(
-            `Projeto ${projeto.id}: peso invalido (${p.peso}) para o papel ${p.papel}`
+            `${this.rotulo(projeto)}: peso invalido (${p.peso}) para o papel ${p.papel}`
           );
         }
       }
     }
     if (Number.isNaN(new Date(projeto.dataEntrega).getTime())) {
-      this.problemas.push(`Projeto ${projeto.id}: data de entrega invalida`);
+      this.problemas.push(`${this.rotulo(projeto)}: data de entrega invalida`);
     }
     return this.problemas.length === antes;
   }

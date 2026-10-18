@@ -1,5 +1,5 @@
 import { Projeto } from "../domain/entities/Projeto";
-import { VisitanteProjeto } from "../visitors/VisitanteProjeto";
+import { ValidadorConsistencia } from "../visitors/ValidadorConsistencia";
 import { RecomendacaoStrategy } from "../strategies/RecomendacaoStrategy";
 import { Observador } from "../observers/Observador";
 
@@ -33,7 +33,8 @@ const CAMPOS_BASE = [
  */
 export abstract class FabricaProjeto {
   abstract criarProjeto(dados: DadosProjeto): Projeto;
-  abstract criarValidador(): VisitanteProjeto;
+  /** E' um VisitanteProjeto que acumula `problemas` para explicar a recusa. */
+  abstract criarValidador(): ValidadorConsistencia;
   abstract criarRecomendador(): RecomendacaoStrategy;
   abstract criarNotificador(): Observador;
 

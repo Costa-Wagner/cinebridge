@@ -18,7 +18,7 @@ export abstract class ValidadorPorTipo<T extends Projeto> extends ValidadorConsi
       this.validarEspecifico(projeto as T);
     } else {
       this.problemas.push(
-        `Projeto ${projeto.id}: esperado ${this.tipoEsperado.name}, recebido ${projeto.constructor.name}`
+        `${this.rotulo(projeto)}: esperado ${this.tipoEsperado.name}, recebido ${projeto.constructor.name}`
       );
     }
     return this.problemas.length === antes;
