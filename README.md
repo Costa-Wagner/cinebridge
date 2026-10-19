@@ -93,6 +93,7 @@ npm run dev
 
 ```
 src/
+├── aplicacao/              # ServicoProjetos + CatalogoProfissionais (carga O(n) + cache)
 ├── config/                # DataSource do TypeORM, perfil ideal de competências por papel
 ├── domain/
 │   ├── entities/            # Projeto, Profissional, Competencia, Avaliacao, Recomendacao, Convite...
@@ -186,7 +187,9 @@ npm run test:coverage # roda com relatório de cobertura
 | Observer | `SistemaRecomendacao`, `ServicoEmail`, `ServicoMensagensInternas`, `ModuloAuditoria` |
 | Visitor | `ValidadorConsistencia`, `CalculadorCompatibilidade`, `GeradorRelatorio` |
 
-Estado atual: **52 testes, 11 suítes, 100% de cobertura de statements/functions/lines, 87.8% de branches** (threshold mínimo: 80% em todas as métricas).
+Estado atual: **197 testes, 24 suítes, ~89% stmts/lines, ~84% branches, ~96% funcs**
+(threshold mínimo: 80%). A carga de profissionais usa `CatalogoProfissionais`
+(queries O(n) + cache com TTL).
 
 Todos os testes são **unitários**: usam objetos fake/mock e chamam as classes diretamente, sem depender do Postgres — por isso rodam mesmo com o Docker parado. Não há testes de integração validando inserção real no banco (essa cobertura hoje é só manual, via `seed.ts` + verificação da rota).
 
@@ -208,7 +211,7 @@ Diferente dos `*.test.ts` (Jest, mocks, sem banco), esses dois scripts fazem exe
 | Sistema | Situação |
 |---|---|
 | Windows 10+ (desenvolvimento) | Testado ponta a ponta |
-| Ubuntu 24.04+ | Testado ponta a ponta via WSL2 — instalação, suíte de testes (52/52) e rota HTTP confirmados |
+| Ubuntu 24.04+ | Testado ponta a ponta via WSL2 — instalação, suíte de testes (197/197) e rota HTTP confirmados |
 
 ## 💾 Persistência de dados
 
@@ -222,3 +225,4 @@ PostgreSQL 16 via Docker Compose, com volume nomeado (`cinebridge_pgdata`) — o
 - Padrões de projeto: Strategy, Template Method, Observer, Visitor
 - Testes unitários com Jest + ts-jest, mocks e fakes, cobertura de código
 - Injeção de dependência explícita via construtor (strategy e publicador injetados no orquestrador)
+- `CatalogoProfissionais`: carga O(n) de profissionais, cache com TTL e invalidação no fluxo de convites

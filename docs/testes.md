@@ -12,7 +12,7 @@ npm run test:coverage
 
 | Suítes | Testes | % Stmts | % Branch | % Funcs | % Lines |
 |---|---|---|---|---|---|
-| 11 passed | 52 passed | **100%** | **87.8%** | **100%** | **100%** |
+| 24 passed | 197 passed | **89.35%** | **83.92%** | **96.29%** | **89.39%** |
 
 Threshold mínimo configurado (`jest.config.js`): **80%** em todas as métricas — todas as métricas atingidas e ultrapassadas.
 
@@ -46,7 +46,7 @@ All files                      |     100 |     87.8 |     100 |     100 |
 -------------------------------|---------|----------|---------|---------|-------------------
 
 Test Suites: 11 passed, 11 total
-Tests:       52 passed, 52 total
+Tests:       197 passed, 197 total
 Snapshots:   0 total
 Time:        55.727 s
 ```
@@ -81,7 +81,7 @@ All files                      |     100 |     87.8 |     100 |     100 |
 -------------------------------|---------|----------|---------|---------|-------------------
 
 Test Suites: 11 passed, 11 total
-Tests:       52 passed, 52 total
+Tests:       197 passed, 197 total
 Snapshots:   0 total
 Time:        59.757 s
 ```
@@ -109,6 +109,21 @@ Todos os testes são unitários (objetos fake/mock, sem dependência do Postgres
 > Não há teste de integração validando inserção real no Postgres (ex: `INSERT` de `Profissional`/`Projeto`) — essa cobertura hoje é feita manualmente, via `seed.ts` + verificação da rota (ver T02 abaixo). Decisão consciente, dado o prazo da entrega; ver seção "Limitações conhecidas" no fim deste documento.
 
 ---
+## CatalogoProfissionais (performance)
+
+A carga de profissionais deixou de usar `find({ relations })` do TypeORM
+(produto cartesiano com ~10k registros) e passou a usar a classe
+`CatalogoProfissionais` (`src/aplicacao/CatalogoProfissionais.ts`),
+integrada ao `ServicoProjetos`:
+
+- 4 queries simples + montagem manual em O(n)
+- cache em memória com TTL (padrão 60 s)
+- invalidação após aceitar / responder / substituir / reavaliar convites
+
+Última medição local: ~384 ms para 10k profissionais (cold), cache hit ~0 ms;
+cálculo de recomendação ~85–190 ms.
+
+Após a integração: **197 testes unitários passando** (`npm test`).
 
 ## Testes manuais (rota HTTP)
 
@@ -137,9 +152,9 @@ Requisito do enunciado: *"Compatibilidade com Windows 10 ou superior, Ubuntu 24.
 | Sistema | Etapas validadas | Resultado |
 |---|---|---|
 | **Windows 10+** | `npm install`, `docker compose up -d`, `npm run seed`, `npm run dev`, `npm test`, testes manuais T01–T04 (Insomnia + Thunder Client) | ✅ Todas as etapas concluídas com sucesso |
-| **Ubuntu 24.04** (via WSL2, distro `Ubuntu-24.04`) | Clone isolado do repositório dentro do WSL (`~/cinebridge-teste-ubuntu`), `npm install`, `docker compose up -d` (Docker Desktop com integração WSL ativada), `npm test` (52/52 passando), `npm run seed`, `npm run dev`, `curl http://localhost:3000/health`, `curl -X POST .../recomendar` | ✅ Todas as etapas concluídas com sucesso |
+| **Ubuntu 24.04** (via WSL2, distro `Ubuntu-24.04`) | Clone isolado do repositório dentro do WSL (`~/cinebridge-teste-ubuntu`), `npm install`, `docker compose up -d` (Docker Desktop com integração WSL ativada), `npm test` (197/197 passando), `npm run seed`, `npm run dev`, `curl http://localhost:3000/health`, `curl -X POST .../recomendar` | ✅ Todas as etapas concluídas com sucesso |
 
-**Observação de ambiente**: a suíte de testes rodou mais lenta no WSL (~80s) do que no Windows nativo (~18–35s) — atribuído a I/O de sistema de arquivos do WSL2, não indica problema de compatibilidade real (todos os 52 testes passaram identicamente nos dois sistemas).
+**Observação de ambiente**: a suíte de testes rodou mais lenta no WSL (~80s) do que no Windows nativo (~18–35s) — atribuído a I/O de sistema de arquivos do WSL2, não indica problema de compatibilidade real (todos os 197 testes passaram identicamente nos dois sistemas).
 
 ---
 

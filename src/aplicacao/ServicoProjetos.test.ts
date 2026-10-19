@@ -79,13 +79,17 @@ function montar(dados: { projeto?: Projeto | null; profissionais?: Profissional[
     }
   } as unknown as DataSource;
 
+  const catalogo = {
+    listar: async () => dados.profissionais ?? [],
+    invalidar: jest.fn()
+  } as any;
+
   const sistema = new SistemaRecomendacao();
   sistema.registrarFabrica(TipoCaptacao.DOCUMENTARIO, new FabricaDocumentario());
   const notificar = jest.spyOn(sistema, "notificarObservadores").mockImplementation(() => {});
   const recomendar = jest.spyOn(sistema, "recomendar");
-  return { servico: new ServicoProjetos(dataSource, sistema), manager, sistema, notificar, recomendar };
+  return { servico: new ServicoProjetos(dataSource, sistema, catalogo), manager, sistema, notificar, recomendar };
 }
-
 const tipos = (notificar: jest.SpyInstance) => notificar.mock.calls.map((c) => (c[0] as { tipo: TipoEvento }).tipo);
 
 describe("ServicoProjetos.criar", () => {

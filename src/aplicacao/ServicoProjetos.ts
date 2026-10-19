@@ -12,6 +12,7 @@ import { Profissional } from "../domain/entities/Profissional";
 import { Equipe } from "../domain/entities/Equipe";
 import { MembroEquipe } from "../domain/entities/MembroEquipe";
 import { Convite } from "../domain/entities/Convite";
+import { CatalogoProfissionais } from "./CatalogoProfissionais";
 
 const RELACOES_PROFISSIONAL = ["competencias", "competencias.competencia", "avaliacoes", "convites", "convites.projeto"];
 const RELACOES_EQUIPE = ["equipe", "equipe.membros", "equipe.membros.profissional", "equipe.membros.convite"];
@@ -23,10 +24,15 @@ export interface AjustesProjeto {
 
 /** Casos de uso da API: orquestra banco + SistemaRecomendacao. */
 export class ServicoProjetos {
+  private readonly catalogo: CatalogoProfissionais;
+
   constructor(
     private readonly dataSource: DataSource,
-    private readonly sistema: SistemaRecomendacao
-  ) {}
+    private readonly sistema: SistemaRecomendacao,
+    catalogo?: CatalogoProfissionais
+  ) {
+    this.catalogo = catalogo ?? new CatalogoProfissionais(dataSource);
+  }
 
   async criar(tipo: TipoCaptacao, dados: DadosProjeto): Promise<Projeto> {
     const projeto = this.sistema.criarProjeto(tipo, dados);
@@ -67,6 +73,7 @@ export class ServicoProjetos {
 
     const convite = projeto.aceitarRecomendacao(papel, profissional);
     await this.salvar(projeto);
+    this.catalogo.invalidar();
 
     this.sistema.notificarObservadores({
       tipo: TipoEvento.CONVITE_ENVIADO,
@@ -104,6 +111,7 @@ export class ServicoProjetos {
       equipe.formadaEm = new Date();
     }
     await this.salvar(projeto);
+    this.catalogo.invalidar();
 
     this.sistema.notificarObservadores({
       tipo: aceito ? TipoEvento.CONVITE_ACEITO : TipoEvento.CONVITE_RECUSADO,
@@ -139,6 +147,7 @@ export class ServicoProjetos {
     projeto.equipe!.membros.push(...(await this.proporMembros(projeto, [papel])));
 
     await this.salvar(projeto, convitesAfetados);
+    this.catalogo.invalidar();
     return this.apresentar(projeto);
   }
 
@@ -158,6 +167,7 @@ export class ServicoProjetos {
     projeto.equipe!.membros.push(...(await this.proporMembros(projeto, papeis)));
 
     await this.salvar(projeto, convitesAfetados);
+    this.catalogo.invalidar();
     return this.apresentar(projeto);
   }
 
@@ -168,7 +178,7 @@ export class ServicoProjetos {
   }
 
   private carregarProfissionais(): Promise<Profissional[]> {
-    return this.dataSource.getRepository(Profissional).find({ relations: RELACOES_PROFISSIONAL });
+    return this.catalogo.listar();
   }
 
   private exigirEquipe(projeto: Projeto): Equipe {
