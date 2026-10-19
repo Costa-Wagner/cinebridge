@@ -1,10 +1,12 @@
 # 📚 DSM – Desenvolvimento de Software Multiplataforma – FATEC/SJC
 
-Atividade prática **ATV1** – TP.II - Técnicas de Programação II · Prof. Dr. Eng. Gerson Penha.
+Atividade prática **ATV1** e **ATV2** – TP.II - Técnicas de Programação II · Prof. Dr. Eng. Gerson Penha.
 
 # 🎬 CineBridge – Recomendação e Orquestração de Equipes
 
 Microsserviço REST que recebe as especificações técnicas de um projeto audiovisual, analisa o perfil dos profissionais cadastrados e compõe automaticamente uma equipe equilibrada — notificando os envolvidos e permitindo ajustes dinâmicos ao longo do processo.
+
+Suporta documentário, animação e publicitário. Depois da recomendação, o produtor aceita membros, os profissionais respondem aos convites e a equipe pode ser reavaliada ou ter membros substituídos. A carga de profissionais usa catálogo otimizado (consultas O(n) e cache) para escalar a dezenas de milhares de registros.
 
 > Primeiro de uma série de exercícios que vão incrementar este mesmo projeto ao longo do semestre — a estrutura aqui documentada é a base sobre a qual as próximas entregas serão construídas.
 
@@ -78,8 +80,8 @@ Versões: Node.js LTS · TypeScript 5.5 (modo `strict`) · Fastify 4 · TypeORM 
 Resumo rápido (pressupõe Node.js LTS e Docker Desktop já instalados e rodando):
 
 ```bash
-git clone https://github.com/SEU_USUARIO/cinebridge-atv1.git
-cd cinebridge-atv1
+git clone https://github.com/SEU_USUARIO/cinebridge.git
+cd cinebridge
 npm install
 cp .env.example .env
 docker compose up -d
@@ -93,19 +95,24 @@ npm run dev
 
 ```
 src/
-├── aplicacao/              # ServicoProjetos + CatalogoProfissionais (carga O(n) + cache)
-├── config/                # DataSource do TypeORM, perfil ideal de competências por papel
+├── aplicacao/       # ServicoProjetos + CatalogoProfissionais
+├── config/          # DataSource TypeORM, perfil de competências por papel
 ├── domain/
-│   ├── entities/            # Projeto, Profissional, Competencia, Avaliacao, Recomendacao, Convite...
-│   └── enums/                # Papel, StatusConvite, TipoCaptacao
-├── strategies/             # Strategy: algoritmos de recomendação + testes
-├── orquestrador/           # Template Method: OrquestradorEquipe / OrquestradorPadrao + testes
-├── observers/              # Observer: Publicador, Assinante e implementações + testes
-├── visitors/               # Visitor: IVisitanteProjeto e implementações + testes
-├── seed.ts                 # Popula o banco com dados de exemplo
-├── testar-orquestrador.ts  # Script de demonstração manual (Strategy + Template Method + Observer)
-├── testar-visitors.ts      # Script de demonstração manual (Visitor)
-└── server.ts               # Entrypoint: Fastify + rota HTTP
+│   ├── entities/    # Projeto, Profissional, Equipe, Convite, Avaliacao...
+│   ├── enums/       # Papel, StatusConvite, StatusEquipe, TipoCaptacao
+│   ├── prototipos/  # Prototype de projetos
+│   └── erros.ts
+├── fabricas/        # Abstract Factory (documentário, animação, publicitário)
+├── strategies/      # Strategy de pontuação/recomendação
+├── orquestrador/    # Template Method (OrquestradorEquipe / OrquestradorPadrao)
+├── observers/       # Observer (SistemaRecomendacao e assinantes)
+├── visitors/        # Visitor (validação, compatibilidade, relatório)
+├── eventos/         # Barramento de eventos externos
+├── integracao/      # Testes de integração
+├── app.ts           # Rotas Fastify
+├── server.ts        # Entrypoint HTTP
+├── composicao.ts    # Wiring (fábricas + observers)
+└── seed.ts          # Dados de exemplo
 ```
 
 Os arquivos de teste automatizado (`*.test.ts`) ficam ao lado do arquivo que testam (ex: `SimilaridadeCosseno.ts` + `SimilaridadeCosseno.test.ts`).
