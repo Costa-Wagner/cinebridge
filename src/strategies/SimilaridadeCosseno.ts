@@ -4,35 +4,49 @@ import {
   ResultadoRecomendacao
 } from "./PontuacaoStrategy";
 import { PERFIL_IDEAL_PAPEL } from "../config/perfilPapel";
-import { Profissional } from "../domain/entities/Profissional";
+import { Papel } from "../domain/enums/Papel";
+import { criarMemo } from "./memoPorProfissional";
 
-function vetorDoProfissional(profissional: Profissional): Map<string, number> {
-  const vetor = new Map<string, number>();
-  for (const vinculo of profissional.competencias ?? []) {
-    vetor.set(vinculo.competencia.nome, Number(vinculo.nivel));
-  }
-  return vetor;
+interface VetorProfissional {
+  competencias: Map<string, number>;
+  norma: number;
 }
 
-function similaridadeCosseno(
-  vetorA: Map<string, number>,
-  vetorB: Record<string, number>
-): number {
-  const chaves = new Set([...vetorA.keys(), ...Object.keys(vetorB)]);
-  let produtoInterno = 0;
-  let normaA = 0;
-  let normaB = 0;
-
-  for (const chave of chaves) {
-    const a = vetorA.get(chave) ?? 0;
-    const b = vetorB[chave] ?? 0;
-    produtoInterno += a * b;
-    normaA += a * a;
-    normaB += b * b;
+const vetorDe = criarMemo<VetorProfissional>((profissional) => {
+  const competencias = new Map<string, number>();
+  for (const vinculo of profissional.competencias ?? []) {
+    competencias.set(vinculo.competencia.nome, Number(vinculo.nivel));
   }
+  let soma = 0;
+  for (const nivel of competencias.values()) soma += nivel * nivel;
+  return { competencias, norma: Math.sqrt(soma) };
+});
 
-  if (normaA === 0 || normaB === 0) return 0;
-  return produtoInterno / (Math.sqrt(normaA) * Math.sqrt(normaB));
+interface PerfilPreparado {
+  pesos: [string, number][];
+  norma: number;
+}
+
+const perfisPreparados = new Map<Papel, PerfilPreparado>();
+
+function perfilDe(papel: Papel): PerfilPreparado {
+  let perfil = perfisPreparados.get(papel);
+  if (!perfil) {
+    const pesos = Object.entries(PERFIL_IDEAL_PAPEL[papel]);
+    perfil = { pesos, norma: Math.sqrt(pesos.reduce((soma, [, peso]) => soma + peso * peso, 0)) };
+    perfisPreparados.set(papel, perfil);
+  }
+  return perfil;
+}
+
+/** Cosseno so' percorre as competencias do perfil: as demais nao entram no produto interno. */
+function similaridadeCosseno(vetor: VetorProfissional, perfil: PerfilPreparado): number {
+  if (vetor.norma === 0 || perfil.norma === 0) return 0;
+  let produtoInterno = 0;
+  for (const [competencia, peso] of perfil.pesos) {
+    produtoInterno += (vetor.competencias.get(competencia) ?? 0) * peso;
+  }
+  return produtoInterno / (vetor.norma * perfil.norma);
 }
 
 /**
@@ -45,12 +59,11 @@ export class SimilaridadeCosseno implements PontuacaoStrategy {
   readonly nome = "SIMILARIDADE_COSSENO";
 
   recomendar(params: ParametrosRecomendacao): ResultadoRecomendacao[] {
-    const perfilIdeal = PERFIL_IDEAL_PAPEL[params.papel];
+    const perfil = perfilDe(params.papel);
 
     return params.candidatos
       .map((profissional) => {
-        const vetor = vetorDoProfissional(profissional);
-        const similaridade = similaridadeCosseno(vetor, perfilIdeal);
+        const similaridade = similaridadeCosseno(vetorDe(profissional), perfil);
         return { profissional, pontuacao: Number((similaridade * 10).toFixed(2)) };
       })
       .sort((a, b) => b.pontuacao - a.pontuacao);

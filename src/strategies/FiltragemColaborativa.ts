@@ -5,24 +5,33 @@ import {
 } from "./PontuacaoStrategy";
 import { StatusConvite } from "../domain/enums/StatusConvite";
 import { Profissional } from "../domain/entities/Profissional";
+import { criarMemo } from "./memoPorProfissional";
 
-function mediaAvaliacoes(profissional: Profissional): number {
+/** Parte da pontuacao que depende so' do historico do profissional. */
+const baseDe = criarMemo<number>((profissional) => {
   const avaliacoes = profissional.avaliacoes ?? [];
-  if (avaliacoes.length === 0) return 5; // neutro, sem historico
-  const soma = avaliacoes.reduce((acc, av) => acc + Number(av.nota), 0);
-  return soma / avaliacoes.length;
-}
+  const media =
+    avaliacoes.length === 0
+      ? 5 // neutro, sem historico
+      : avaliacoes.reduce((acc, av) => acc + Number(av.nota), 0) / avaliacoes.length;
+  const confiabilidade = Math.min(1, avaliacoes.length / 5); // satura a confianca com 5+ avaliacoes
+  return media * (0.7 + 0.3 * confiabilidade);
+});
 
-function confiabilidade(profissional: Profissional): number {
-  const quantidade = (profissional.avaliacoes ?? []).length;
-  return Math.min(1, quantidade / 5); // satura a confianca com 5+ avaliacoes
-}
+/** Convites aceitos por genero de projeto, para o bonus de afinidade. */
+const aceitosPorGenero = criarMemo<Map<string, number>>((profissional) => {
+  const contagem = new Map<string, number>();
+  for (const convite of profissional.convites ?? []) {
+    const genero = convite.projeto?.genero;
+    if (convite.status === StatusConvite.ACEITO && genero !== undefined) {
+      contagem.set(genero, (contagem.get(genero) ?? 0) + 1);
+    }
+  }
+  return contagem;
+});
 
 function afinidadeGenero(profissional: Profissional, genero: string): number {
-  const convitesAceitos = (profissional.convites ?? []).filter(
-    (c) => c.status === StatusConvite.ACEITO && c.projeto?.genero === genero
-  );
-  return Math.min(1, convitesAceitos.length / 3); // ate 1 ponto de bonus
+  return Math.min(1, (aceitosPorGenero(profissional).get(genero) ?? 0) / 3); // ate 1 ponto de bonus
 }
 
 /**
@@ -42,7 +51,7 @@ export class FiltragemColaborativa implements PontuacaoStrategy {
 
     return candidatos
       .map((profissional) => {
-        const base = mediaAvaliacoes(profissional) * (0.7 + 0.3 * confiabilidade(profissional));
+        const base = baseDe(profissional);
         const bonus = afinidadeGenero(profissional, projeto.genero);
         const pontuacao = Math.min(10, base + bonus);
         return { profissional, pontuacao: Number(pontuacao.toFixed(2)) };

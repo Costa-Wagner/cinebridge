@@ -14,7 +14,6 @@ import { MembroEquipe } from "../domain/entities/MembroEquipe";
 import { Convite } from "../domain/entities/Convite";
 import { CatalogoProfissionais } from "./CatalogoProfissionais";
 
-const RELACOES_PROFISSIONAL = ["competencias", "competencias.competencia", "avaliacoes", "convites", "convites.projeto"];
 const RELACOES_EQUIPE = ["equipe", "equipe.membros", "equipe.membros.profissional", "equipe.membros.convite"];
 
 export interface AjustesProjeto {
@@ -34,6 +33,11 @@ export class ServicoProjetos {
     this.catalogo = catalogo ?? new CatalogoProfissionais(dataSource);
   }
 
+  /** Carrega o cadastro de profissionais antes da primeira requisicao (usado na subida do servidor). */
+  async aquecerCadastro(): Promise<void> {
+    await this.catalogo.listar();
+  }
+
   async criar(tipo: TipoCaptacao, dados: DadosProjeto): Promise<Projeto> {
     const projeto = this.sistema.criarProjeto(tipo, dados);
     return this.dataSource.manager.save(projeto);
@@ -50,7 +54,8 @@ export class ServicoProjetos {
       throw new OperacaoInvalidaError("Equipe ja tem convites em andamento; use a reavaliacao");
     }
 
-    const profissionais = await this.carregarProfissionais();
+    const papeis = projeto.papeisObrigatorios.map((p) => p.papel as Papel);
+    const profissionais = await this.catalogo.preSelecionar(papeis);
     const equipe = this.sistema.recomendar(projeto, profissionais);
     await this.dataSource.transaction(async (manager) => {
       await manager.createQueryBuilder().delete().from(Equipe).where("projeto_id = :id", { id: projeto.id }).execute();
@@ -177,10 +182,6 @@ export class ServicoProjetos {
     return this.dataSource.getRepository(Projeto).findOne({ where: { id }, relations: RELACOES_EQUIPE });
   }
 
-  private carregarProfissionais(): Promise<Profissional[]> {
-    return this.catalogo.listar();
-  }
-
   private exigirEquipe(projeto: Projeto): Equipe {
     if (!projeto.equipe) {
       throw new OperacaoInvalidaError("Projeto ainda nao tem equipe proposta; recomende antes");
@@ -203,10 +204,10 @@ export class ServicoProjetos {
 
   /** Sugere membro para cada papel, sem repetir quem ja esta na equipe nem quem o produtor dispensou naquele papel. */
   private async proporMembros(projeto: Projeto, papeis: Papel[]): Promise<MembroEquipe[]> {
-    const todos = await this.carregarProfissionais();
     const ocupados = new Set(projeto.equipe!.membros.map((m) => m.profissional.id));
     const novos: MembroEquipe[] = [];
     for (const papel of papeis) {
+      const todos = await this.catalogo.preSelecionar([papel]);
       const dispensados = new Set((projeto.rejeitados ?? []).filter((r) => r.papel === papel).map((r) => r.profissionalId));
       const candidatos = todos.filter((p) => !ocupados.has(p.id) && !dispensados.has(p.id));
       for (const membro of this.sistema.recomendar(projeto, candidatos, undefined, [papel]).membros) {

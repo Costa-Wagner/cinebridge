@@ -1,5 +1,6 @@
 import { DataSource } from "typeorm";
 import { ServicoProjetos } from "./ServicoProjetos";
+import { CatalogoProfissionais } from "./CatalogoProfissionais";
 import { SistemaRecomendacao } from "../observers/SistemaRecomendacao";
 import { TipoEvento } from "../observers/TipoEvento";
 import { FabricaDocumentario } from "../fabricas/documentario/FabricaDocumentario";
@@ -80,17 +81,29 @@ function montar(dados: { projeto?: Projeto | null; profissionais?: Profissional[
   } as unknown as DataSource;
 
   const catalogo = {
-    listar: async () => dados.profissionais ?? [],
+    listar: jest.fn(async () => dados.profissionais ?? []),
+    preSelecionar: jest.fn(async () => dados.profissionais ?? []),
     invalidar: jest.fn()
-  } as any;
+  };
 
   const sistema = new SistemaRecomendacao();
   sistema.registrarFabrica(TipoCaptacao.DOCUMENTARIO, new FabricaDocumentario());
   const notificar = jest.spyOn(sistema, "notificarObservadores").mockImplementation(() => {});
   const recomendar = jest.spyOn(sistema, "recomendar");
-  return { servico: new ServicoProjetos(dataSource, sistema, catalogo), manager, sistema, notificar, recomendar };
+  const servico = new ServicoProjetos(dataSource, sistema, catalogo as unknown as CatalogoProfissionais);
+  return { servico, manager, sistema, notificar, recomendar, catalogo };
 }
 const tipos = (notificar: jest.SpyInstance) => notificar.mock.calls.map((c) => (c[0] as { tipo: TipoEvento }).tipo);
+
+describe("ServicoProjetos.aquecerCadastro", () => {
+  it("carrega o cadastro de profissionais antes da primeira requisicao", async () => {
+    const { servico, catalogo } = montar({ profissionais: [ana] });
+
+    await servico.aquecerCadastro();
+
+    expect(catalogo.listar).toHaveBeenCalledTimes(1);
+  });
+});
 
 describe("ServicoProjetos.criar", () => {
   it("cria pela fabrica do tipo e grava o projeto", async () => {
@@ -122,13 +135,14 @@ describe("ServicoProjetos.recomendar e buscarEquipe", () => {
 
   it("substitui a equipe anterior (sem convites) pela nova", async () => {
     const projeto = criarProjeto([membro(Papel.DIRETOR, ana)]);
-    const { servico, manager, recomendar } = montar({ projeto, profissionais: [ana, bruno] });
+    const { servico, manager, recomendar, catalogo } = montar({ projeto, profissionais: [ana, bruno] });
     const nova = parcial(membro(Papel.DIRETOR, bruno));
     recomendar.mockReturnValue(nova);
 
     const equipe = await servico.recomendar("proj-1");
 
     expect(equipe).toBe(nova);
+    expect(catalogo.preSelecionar).toHaveBeenCalledWith([Papel.DIRETOR, Papel.EDITOR]);
     expect(recomendar).toHaveBeenCalledWith(projeto, [ana, bruno]);
     expect(manager.save).toHaveBeenCalledWith(nova);
   });
@@ -148,10 +162,11 @@ describe("ServicoProjetos.recomendar e buscarEquipe", () => {
 describe("ServicoProjetos.aceitarRecomendacao", () => {
   it("cria o convite, grava e avisa o profissional", async () => {
     const projeto = criarProjeto([membro(Papel.DIRETOR, ana)]);
-    const { servico, manager, notificar } = montar({ projeto });
+    const { servico, manager, notificar, catalogo } = montar({ projeto });
 
     const criado = await servico.aceitarRecomendacao("proj-1", Papel.DIRETOR, "1");
 
+    expect(catalogo.invalidar).toHaveBeenCalledTimes(1);
     expect(criado).toMatchObject({ status: StatusConvite.PENDENTE, papel: Papel.DIRETOR });
     expect(manager.save).toHaveBeenCalledWith(projeto.equipe);
     expect(notificar).toHaveBeenCalledWith({ tipo: TipoEvento.CONVITE_ENVIADO, projeto, papel: Papel.DIRETOR, candidatos: [ana] });

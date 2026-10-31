@@ -4,15 +4,18 @@ import {
   ResultadoRecomendacao
 } from "./PontuacaoStrategy";
 import { Profissional } from "../domain/entities/Profissional";
-import { Projeto } from "../domain/entities/Projeto";
+import { criarMemo } from "./memoPorProfissional";
 
-function estaDisponivel(profissional: Profissional, projeto: Projeto): boolean {
-  const entrega = new Date(projeto.dataEntrega).getTime();
-  return (profissional.disponibilidade ?? []).some((janela) => {
-    const inicio = new Date(janela.inicio).getTime();
-    const fim = new Date(janela.fim).getTime();
-    return entrega >= inicio && entrega <= fim;
-  });
+/** Janelas de disponibilidade ja convertidas em timestamps (evita reprocessar datas a cada consulta). */
+const janelasDe = criarMemo<[number, number][]>((profissional) =>
+  (profissional.disponibilidade ?? []).map((janela) => [
+    new Date(janela.inicio).getTime(),
+    new Date(janela.fim).getTime()
+  ])
+);
+
+function estaDisponivel(profissional: Profissional, entrega: number): boolean {
+  return janelasDe(profissional).some(([inicio, fim]) => entrega >= inicio && entrega <= fim);
 }
 
 /**
@@ -28,11 +31,12 @@ export class RegrasOrcamento implements PontuacaoStrategy {
 
   recomendar(params: ParametrosRecomendacao): ResultadoRecomendacao[] {
     const { projeto, candidatos } = params;
+    const entrega = new Date(projeto.dataEntrega).getTime();
     const limiteDiaria = Number(projeto.orcamentoTotal) * 0.05; // heuristica: 5% do orcamento por diaria e' saudavel
 
     return candidatos
       .map((profissional) => {
-        if (!estaDisponivel(profissional, projeto)) {
+        if (!estaDisponivel(profissional, entrega)) {
           return { profissional, pontuacao: 0 };
         }
 
