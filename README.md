@@ -303,13 +303,17 @@ Duas decisões sustentam o requisito:
 | Ambiente | Custo por requisição | p95 (cadastro em memória) | Resultado |
 |---|---|---|---|
 | Referência: Ubuntu 24.04, Postgres 16 local | 8–10 ms | **0,75–0,97 s** | Atende |
-| Windows 10+, Docker Desktop, Postgres 18 | ~36 ms | **~3,6 s** | **Não atende** o limite de 2 s |
+| Referência com `CACHE` (padrão da ATV3) | 6,3 ms (era 8,0) | **0,62 s** (era 0,80 s) | Atende |
+| Windows 10+, Docker Desktop, Postgres 18 (ATV2) | ~36 ms | **~3,6 s** | **Não atende** o limite de 2 s |
+| Windows 10+, Docker Desktop, Postgres 18 (ATV3, sem decoradores no script) | 33,3 ms | **3,27 s** | **Não atende** o limite de 2 s |
 
 O Node executa o código da aplicação em uma única thread: com 100 requisições simultâneas, o tempo total é proporcional ao custo de processamento por requisição, e esse custo varia com a velocidade do processador. Na medição em Windows o banco não é o gargalo (ida e volta de ~1,4 ms); o custo de processamento é cerca de 3,5 vezes maior que no ambiente de referência. A rodada com cadastro "frio" (a primeira requisição lê os 10 mil profissionais) é só informativa: levou ~7,5 s no Windows, e por isso o servidor carrega o cadastro na subida.
 
+O script de carga usa a mesma pilha de decoradores do servidor (`DECORADORES`, padrão `CACHE`; `DECORADORES=` vazio mede sem decoradores). Em Windows o cache sozinho não leva o p95 a 2 s: o custo de processamento continua ~4 vezes o do ambiente de referência.
+
 O script imprime ao final um diagnóstico (ida e volta ao banco, uma requisição isolada e custo médio por requisição) para interpretar o resultado em qualquer máquina. Parâmetros: `PROFISSIONAIS`, `REQUISICOES`, `LIMITE_MS`; `DB_POOL` ajusta as conexões simultâneas com o banco (padrão 20).
 
-Caminhos para reduzir o custo em hardware mais lento: o `CacheDecorator` da ATV3 (evita recalcular recomendações repetidas; ativo por padrão em `DECORADORES=CACHE`, ainda sem medição neste quadro) e executar mais de um processo Node (`cluster`), que usa todos os núcleos do processador.
+Caminhos para reduzir o custo em hardware mais lento: o `CacheDecorator` da ATV3 (evita recalcular recomendações repetidas; ativo por padrão em `DECORADORES=CACHE`, ganho medido no ambiente de referência: ~20% no custo por requisição, porque o ranking é só parte do custo; o restante é gravação no banco e serialização) e executar mais de um processo Node (`cluster`), que usa todos os núcleos do processador.
 
 ## 🔩 Scripts de demonstração manual
 

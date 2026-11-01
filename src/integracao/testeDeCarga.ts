@@ -4,6 +4,7 @@ import { gerarProfissionaisEmMassa, NOME_BANCO_CARGA, prepararBancoDeTestes } fr
 import { criarApp } from "../app";
 import { montarSistema } from "../composicao";
 import { ServicoProjetos } from "../aplicacao/ServicoProjetos";
+import { ConfiguracaoDecoradores } from "../decoradores/PilhaDecoradores";
 import { CatalogoProfissionais } from "../aplicacao/CatalogoProfissionais";
 
 /**
@@ -43,7 +44,9 @@ async function principal(): Promise<void> {
   await gerarProfissionaisEmMassa(ds, PROFISSIONAIS);
 
   const catalogo = new CatalogoProfissionais(ds);
-  const app = criarApp(new ServicoProjetos(ds, montarSistema(), catalogo));
+  // mesma configuracao do servidor: DECORADORES (padrao CACHE); DECORADORES="" mede sem decoradores
+  const decoradores = new ConfiguracaoDecoradores(process.env.DECORADORES ?? "CACHE");
+  const app = criarApp(new ServicoProjetos(ds, montarSistema(), catalogo, decoradores));
   const logOriginal = console.log;
   if (silenciar) console.log = () => {};
 
