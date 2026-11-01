@@ -278,7 +278,18 @@ Duas decisões sustentam o requisito:
 1. **`CatalogoProfissionais`**: o `find({ relations })` do TypeORM gera produto cartesiano e estoura a memória do Node com 10 mil registros (medido: 99 requisições simultâneas derrubavam o processo). O catálogo lê o cadastro com 4 consultas simples, monta as entidades em O(n), o compartilha entre as requisições (uma única leitura, mesmo com requisições simultâneas), o renova a cada 60 s e o invalida quando os convites mudam. O servidor o carrega na subida.
 2. **Pré-seleção por aderência**: a cada carga do cadastro, monta-se por papel um ranking de aderência (cosseno com o perfil do papel). A recomendação recebe só os 30 mais aderentes de cada papel e cada tipo de projeto os reordena com os seus critérios (reputação, orçamento, software). É a estratégia usual de *geração de candidatos + ranqueamento*: o custo por requisição não cresce com o cadastro. O trade-off é que um profissional fora dos 30 mais aderentes de um papel nunca é considerado para ele (`LIMITE_PRESELECAO`).
 
-Medição local (`npm run carga`, 10 mil profissionais, 100 requisições simultâneas, API em memória): **p95 ≈ 0,8–1,0 s** com o cadastro em memória (limite: 2 s), cerca de 8–10 ms de processamento por requisição. A rodada com cadastro "frio" (a primeira requisição lê o cadastro) é só informativa e fica em torno de 2 a 2,5 s; por isso o servidor carrega o cadastro na subida. O Node processa uma requisição por vez, então o tempo total é proporcional à velocidade do processador da máquina: o script imprime no fim um diagnóstico (ida e volta ao banco, uma requisição isolada e o custo médio por requisição) para interpretar o resultado em outro computador. Parâmetros: `PROFISSIONAIS`, `REQUISICOES`, `LIMITE_MS`; `DB_POOL` ajusta as conexões simultâneas com o banco (padrão 20).
+**Medições** (`npm run carga`, 10 mil profissionais, 100 requisições simultâneas, API em memória; limite: p95 ≤ 2 s com o cadastro em memória):
+
+| Ambiente | Custo por requisição | p95 (cadastro em memória) | Resultado |
+|---|---|---|---|
+| Referência: Ubuntu 24.04, Postgres 16 local | 8–10 ms | **0,75–0,97 s** | Atende |
+| Windows 10+, Docker Desktop, Postgres 18 | ~36 ms | **~3,6 s** | **Não atende** o limite de 2 s |
+
+O Node executa o código da aplicação em uma única thread: com 100 requisições simultâneas, o tempo total é proporcional ao custo de processamento por requisição, e esse custo varia com a velocidade do processador. Na medição em Windows o banco não é o gargalo (ida e volta de ~1,4 ms); o custo de processamento é cerca de 3,5 vezes maior que no ambiente de referência. A rodada com cadastro "frio" (a primeira requisição lê os 10 mil profissionais) é só informativa: levou ~7,5 s no Windows, e por isso o servidor carrega o cadastro na subida.
+
+O script imprime ao final um diagnóstico (ida e volta ao banco, uma requisição isolada e custo médio por requisição) para interpretar o resultado em qualquer máquina. Parâmetros: `PROFISSIONAIS`, `REQUISICOES`, `LIMITE_MS`; `DB_POOL` ajusta as conexões simultâneas com o banco (padrão 20).
+
+Caminhos para reduzir o custo em hardware mais lento: o `CacheDecorator` da ATV3 (evita recalcular recomendações repetidas) e executar mais de um processo Node (`cluster`), que usa todos os núcleos do processador.
 
 ## 🔩 Scripts de demonstração manual
 

@@ -128,6 +128,7 @@ O script cria o banco `cinebridge_carga`, gera os profissionais direto no banco,
 |---|---|---|
 | 99 requisições simultâneas, 10 mil profissionais | processo Node encerrado por falta de memória | **p95 ≈ 0,8–1,0 s**, sem falhas |
 | Primeira requisição (cadastro frio) | — | informativo: ~2–2,5 s (a leitura do cadastro entra na conta) |
+| 100 requisições simultâneas, 10 mil profissionais (Windows 10+, Docker Desktop, Postgres 18) | — | **p95 ≈ 3,6 s** (custo ~36 ms por requisição); o limite de 2 s não é atendido neste hardware, ver README |
 
 Medições no ambiente de desenvolvimento (Ubuntu 24.04, Postgres local); o resultado depende do processador da máquina, e o script imprime um diagnóstico para interpretá-lo em outro computador. A rodada "fria" não é critério de aprovação porque o servidor carrega o cadastro na subida. Detalhes das decisões: seção "Desempenho" do README.
 
