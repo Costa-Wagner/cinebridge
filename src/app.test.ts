@@ -8,6 +8,7 @@ import { MembroEquipe } from "./domain/entities/MembroEquipe";
 import { Profissional } from "./domain/entities/Profissional";
 import { Papel } from "./domain/enums/Papel";
 import { StatusEquipe } from "./domain/enums/StatusEquipe";
+import { ConfiguracaoDecoradores } from "./decoradores/PilhaDecoradores";
 
 const ID = "0350ed4b-6747-4d61-946f-32a935d8f85d";
 const ana = { id: "p1", nome: "Ana" } as Profissional;
@@ -45,7 +46,8 @@ function montar() {
     substituirMembro: jest.fn(),
     reavaliar: jest.fn(),
     responderConvite: jest.fn(),
-    listarRecomendacoes: jest.fn()
+    listarRecomendacoes: jest.fn(),
+    decoradores: new ConfiguracaoDecoradores()
   };
   const app = criarApp(servico as unknown as ServicoProjetos);
   return { app, servico };
@@ -116,6 +118,44 @@ describe("API", () => {
 
       expect(resposta.statusCode).toBe(500);
       expect(resposta.json()).toEqual({ erro: "Erro interno" });
+    });
+  });
+
+  describe("configuracao dos decoradores", () => {
+    it("GET mostra a pilha atual e as opcoes; PUT troca em tempo de execucao", async () => {
+      const { app } = montar();
+
+      const inicial = await app.inject({ method: "GET", url: "/configuracao/decoradores" });
+      expect(inicial.json()).toEqual({ pilha: [], disponiveis: ["CACHE", "AUDITORIA", "COMPRESSAO"] });
+
+      const troca = await app.inject({ method: "PUT", url: "/configuracao/decoradores", payload: { pilha: ["cache", "auditoria"] } });
+      expect(troca.statusCode).toBe(200);
+      expect(troca.json()).toEqual({ pilha: ["CACHE", "AUDITORIA"] });
+      expect((await app.inject({ method: "GET", url: "/configuracao/decoradores" })).json().pilha).toEqual(["CACHE", "AUDITORIA"]);
+    });
+
+    it("PUT recusa decorador desconhecido (400) e corpo sem pilha (400), sem alterar a configuracao", async () => {
+      const { app, servico } = montar();
+      servico.decoradores.definir("CACHE");
+
+      const desconhecido = await app.inject({ method: "PUT", url: "/configuracao/decoradores", payload: { pilha: ["LOG"] } });
+      const semPilha = await app.inject({ method: "PUT", url: "/configuracao/decoradores", payload: {} });
+
+      expect(desconhecido.statusCode).toBe(400);
+      expect(desconhecido.json().erro).toContain("LOG");
+      expect(semPilha.statusCode).toBe(400);
+      expect(servico.decoradores.obter()).toEqual(["CACHE"]);
+    });
+
+    it("a recomendacao repassa a preferencia de decoradores do produtor", async () => {
+      const { app, servico } = montar();
+      servico.recomendar.mockResolvedValue(criarEquipe());
+
+      await app.inject({ method: "POST", url: `/projetos/${ID}/recomendar`, payload: { decoradores: ["AUDITORIA"] } });
+      await app.inject({ method: "POST", url: `/projetos/${ID}/recomendar` });
+
+      expect(servico.recomendar).toHaveBeenNthCalledWith(1, ID, { decoradores: ["AUDITORIA"] });
+      expect(servico.recomendar).toHaveBeenNthCalledWith(2, ID, { decoradores: undefined });
     });
   });
 
@@ -242,7 +282,7 @@ describe("API", () => {
       ["responder", `/convites/${ID}/responder`, "responderConvite", { aceito: false }]
     ])("%s: 404 quando o servico nao encontra o recurso", async (_nome, url, metodo, payload) => {
       const { app, servico } = montar();
-      (servico as Record<string, jest.Mock>)[metodo].mockResolvedValue(null);
+      (servico as unknown as Record<string, jest.Mock>)[metodo].mockResolvedValue(null);
 
       const resposta = await app.inject({ method: "POST", url, payload });
 
