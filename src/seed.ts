@@ -7,6 +7,8 @@ import { Profissional } from "./domain/entities/Profissional";
 import { ProfissionalCompetencia } from "./domain/entities/ProfissionalCompetencia";
 import { Avaliacao } from "./domain/entities/Avaliacao";
 import { ProjetoAnimacao } from "./domain/entities/ProjetoAnimacao";
+import { PacoteServico } from "./domain/servicos/PacoteServico";
+import { ServicoAtomico } from "./domain/servicos/ServicoAtomico";
 import { Papel } from "./domain/enums/Papel";
 
 interface CompetenciaSeed {
@@ -179,14 +181,20 @@ async function seedProjeto(ds: DataSource): Promise<ProjetoAnimacao> {
       softwareModelagem: "Blender",
       metricasRenderizacao: ["tempo por quadro", "custo de render farm"],
       localizacaoFilmagem: "Rio de Janeiro",
-      papeisObrigatorios: [
-        { papel: Papel.DIRETOR, peso: 10 },
-        { papel: Papel.DIRETOR_FOTOGRAFIA, peso: 9 },
-        { papel: Papel.SONOPLASTA, peso: 6 },
-        { papel: Papel.EDITOR, peso: 7 },
-        { papel: Papel.ROTEIRISTA, peso: 8 },
-        { papel: Papel.ESPECIALISTA_EFEITOS_VISUAIS, peso: 5 }
-      ]
+      servicoPrincipal: new PacoteServico("Animacao", [
+        new PacoteServico("Pre-producao", [
+          new ServicoAtomico("Direcao", Papel.DIRETOR, 10, 9000, 20),
+          new ServicoAtomico("Roteiro", Papel.ROTEIRISTA, 8, 5000, 15)
+        ]),
+        new PacoteServico("Producao", [
+          new ServicoAtomico("Direcao de fotografia", Papel.DIRETOR_FOTOGRAFIA, 9, 7000, 25),
+          new ServicoAtomico("Efeitos visuais", Papel.ESPECIALISTA_EFEITOS_VISUAIS, 5, 6000, 30)
+        ], "PARALELO"),
+        new PacoteServico("Pos-producao", [
+          new ServicoAtomico("Edicao", Papel.EDITOR, 7, 4000, 12),
+          new ServicoAtomico("Mixagem de audio", Papel.SONOPLASTA, 6, 3000, 8)
+        ])
+      ])
     })
   );
 }

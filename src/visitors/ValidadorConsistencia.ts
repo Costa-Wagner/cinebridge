@@ -33,6 +33,9 @@ export class ValidadorConsistencia implements VisitanteProjeto {
         }
       }
     }
+    for (const problema of projeto.servicoPrincipal?.validar() ?? []) {
+      this.problemas.push(`${this.rotulo(projeto)}: ${problema}`);
+    }
     if (Number.isNaN(new Date(projeto.dataEntrega).getTime())) {
       this.problemas.push(`${this.rotulo(projeto)}: data de entrega invalida`);
     }

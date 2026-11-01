@@ -5,7 +5,8 @@ import {
   OneToMany,
   OneToOne,
   CreateDateColumn,
-  TableInheritance
+  TableInheritance,
+  ValueTransformer
 } from "typeorm";
 import { TipoCaptacao } from "../enums/TipoCaptacao";
 import { PapelObrigatorio } from "./PapelObrigatorio";
@@ -17,8 +18,17 @@ import type { Profissional } from "./Profissional";
 import { Papel } from "../enums/Papel";
 import { StatusConvite } from "../enums/StatusConvite";
 import { OperacaoInvalidaError } from "../erros";
+import { ServicoProjeto, DadoServico } from "../servicos/ServicoProjeto";
+import { PacoteServico } from "../servicos/PacoteServico";
+import { servicoDeJSON, pacoteDePapeis, papeisDaArvore } from "../servicos/arvore";
 import type { ElementoVisitavel } from "../../visitors/ElementoVisitavel";
 import type { VisitanteProjeto } from "../../visitors/VisitanteProjeto";
+
+/** Persiste a arvore do Composite como JSON; linhas antigas/vazias viram um pacote vazio. */
+const transformadorServico: ValueTransformer = {
+  to: (servico?: ServicoProjeto) => servico?.paraJSON(),
+  from: (json?: DadoServico | null) => (json?.tipo ? servicoDeJSON(json) : new PacoteServico("Projeto"))
+};
 
 /**
  * Tabela unica com discriminador `tipoCaptacao`: cada tipo de projeto
@@ -50,8 +60,36 @@ export class Projeto implements ElementoVisitavel {
   @Column()
   localizacaoFilmagem!: string;
 
-  @Column("jsonb")
-  papeisObrigatorios!: PapelObrigatorio[];
+  /** Raiz do Composite: pacote/servico que descreve tudo o que o projeto exige (papeis, custo, prazo). */
+  @Column({ type: "jsonb", transformer: transformadorServico, default: () => "'{}'" })
+  servicoPrincipal!: ServicoProjeto;
+
+  /** Derivado da arvore (folhas = servicos atomicos); atribuir cria um pacote plano, um servico por papel. */
+  get papeisObrigatorios(): PapelObrigatorio[] {
+    return this.servicoPrincipal ? papeisDaArvore(this.servicoPrincipal) : [];
+  }
+
+  set papeisObrigatorios(papeis: PapelObrigatorio[]) {
+    this.servicoPrincipal = pacoteDePapeis(papeis);
+  }
+
+  /** Delega a raiz da arvore, que propaga recursivamente. */
+  calcularCustoTotal(): number {
+    return this.servicoPrincipal.calcularCusto();
+  }
+
+  obterPrazoTotal(): number {
+    return this.servicoPrincipal.obterPrazo();
+  }
+
+  validarServicos(): string[] {
+    return this.servicoPrincipal ? this.servicoPrincipal.validar() : ["Projeto sem servico principal"];
+  }
+
+  /** Mantem `papeisObrigatorios` (derivado) na resposta JSON da API. */
+  toJSON(): Record<string, unknown> {
+    return { ...(this as object), papeisObrigatorios: this.papeisObrigatorios };
+  }
 
   @OneToMany(() => Recomendacao, (recomendacao) => recomendacao.projeto)
   recomendacoes!: Recomendacao[];
@@ -87,7 +125,7 @@ export class Projeto implements ElementoVisitavel {
     copia.dataEntrega = this.dataEntrega;
     copia.tipoCaptacao = this.tipoCaptacao;
     copia.localizacaoFilmagem = this.localizacaoFilmagem;
-    copia.papeisObrigatorios = this.papeisObrigatorios.map((p) => ({ ...p }));
+    copia.servicoPrincipal = servicoDeJSON(this.servicoPrincipal.paraJSON());
     copia.rejeitados = [];
     return copia;
   }

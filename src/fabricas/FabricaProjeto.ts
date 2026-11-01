@@ -2,6 +2,9 @@ import { Projeto } from "../domain/entities/Projeto";
 import { ValidadorConsistencia } from "../visitors/ValidadorConsistencia";
 import { RecomendacaoStrategy } from "../strategies/RecomendacaoStrategy";
 import { Observador } from "../observers/Observador";
+import { DadoServico } from "../domain/servicos/ServicoProjeto";
+import { servicoDeJSON } from "../domain/servicos/arvore";
+import { ProjetoInvalidoError } from "../orquestrador/ProjetoInvalidoError";
 
 export interface DadosProjeto {
   genero?: string;
@@ -10,6 +13,8 @@ export interface DadosProjeto {
   dataEntrega?: string;
   localizacaoFilmagem?: string;
   papeisObrigatorios?: { papel: string; peso: number }[];
+  /** Arvore de servicos (Composite) em JSON; tem precedencia sobre `papeisObrigatorios`. */
+  servicoPrincipal?: DadoServico;
   [campoEspecifico: string]: any;
 }
 
@@ -51,7 +56,13 @@ export abstract class FabricaProjeto {
         alvo[campo] = Array.isArray(valor) ? [...valor] : valor;
       }
     }
-    if (dados.papeisObrigatorios) {
+    if (dados.servicoPrincipal) {
+      try {
+        projeto.servicoPrincipal = servicoDeJSON(dados.servicoPrincipal);
+      } catch (erro) {
+        throw new ProjetoInvalidoError([(erro as Error).message]);
+      }
+    } else if (dados.papeisObrigatorios) {
       projeto.papeisObrigatorios = dados.papeisObrigatorios.map((p) => ({ ...p })) as T["papeisObrigatorios"];
     }
     return projeto;

@@ -43,6 +43,7 @@ const schemaCriarProjeto = {
       orcamentoTotal: { type: "number" },
       dataEntrega: { type: "string", format: "date" },
       localizacaoFilmagem: { type: "string" },
+      servicoPrincipal: { type: "object" },
       papeisObrigatorios: {
         type: "array",
         items: {
