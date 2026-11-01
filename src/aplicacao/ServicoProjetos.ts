@@ -14,6 +14,7 @@ import { MembroEquipe } from "../domain/entities/MembroEquipe";
 import { Convite } from "../domain/entities/Convite";
 import { Recomendacao } from "../domain/entities/Recomendacao";
 import { CatalogoProfissionais } from "./CatalogoProfissionais";
+import { AdaptadorInterno } from "../adaptadores/profissional/AdaptadorInterno";
 
 const RELACOES_EQUIPE = ["equipe", "equipe.membros", "equipe.membros.profissional", "equipe.membros.convite"];
 
@@ -32,6 +33,9 @@ export class ServicoProjetos {
     catalogo?: CatalogoProfissionais
   ) {
     this.catalogo = catalogo ?? new CatalogoProfissionais(dataSource);
+    if (!sistema.temAdaptadorProfissional()) {
+      sistema.configurarAdaptadores({ profissional: new AdaptadorInterno(this.catalogo, dataSource) });
+    }
   }
 
   /** Carrega o cadastro de profissionais antes da primeira requisicao (usado na subida do servidor). */
@@ -56,9 +60,7 @@ export class ServicoProjetos {
       throw new OperacaoInvalidaError("Equipe ja tem convites em andamento; use a reavaliacao");
     }
 
-    const papeis = projeto.papeisObrigatorios.map((p) => p.papel as Papel);
-    const profissionais = await this.catalogo.preSelecionar(papeis);
-    const equipe = this.sistema.recomendar(projeto, profissionais);
+    const equipe = await this.sistema.executarRecomendacao(projeto);
 
     // gravacao em lote (INSERTs diretos): e' uma equipe nova, sem nada a comparar com o banco
     await this.dataSource.transaction(async (manager) => {
@@ -240,10 +242,9 @@ export class ServicoProjetos {
     const novos: MembroEquipe[] = [];
     const rodadas: Equipe[] = [];
     for (const papel of papeis) {
-      const todos = await this.catalogo.preSelecionar([papel]);
-      const dispensados = new Set((projeto.rejeitados ?? []).filter((r) => r.papel === papel).map((r) => r.profissionalId));
-      const candidatos = todos.filter((p) => !ocupados.has(p.id) && !dispensados.has(p.id));
-      const rodada = this.sistema.recomendar(projeto, candidatos, undefined, [papel]);
+      const dispensados = (projeto.rejeitados ?? []).filter((r) => r.papel === papel).map((r) => r.profissionalId);
+      const excluir = new Set([...ocupados, ...dispensados]);
+      const rodada = await this.sistema.executarRecomendacao(projeto, { papeis: [papel], excluir });
       rodadas.push(rodada);
       for (const membro of rodada.membros) {
         ocupados.add(membro.profissional.id);

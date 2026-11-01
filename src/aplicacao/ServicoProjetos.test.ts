@@ -166,7 +166,7 @@ describe("ServicoProjetos.recomendar e buscarEquipe", () => {
 
     expect(equipe).toBe(nova);
     expect(catalogo.preSelecionar).toHaveBeenCalledWith([Papel.DIRETOR, Papel.EDITOR]);
-    expect(recomendar).toHaveBeenCalledWith(projeto, [ana, bruno]);
+    expect(recomendar).toHaveBeenCalledWith(projeto, [ana, bruno], undefined, undefined);
     expect(manager.insert).toHaveBeenCalledWith(Equipe, nova);
     expect(manager.insert).toHaveBeenCalledWith(MembroEquipe, nova.membros);
     expect(nova.membros.every((m) => m.equipe === nova)).toBe(true);
