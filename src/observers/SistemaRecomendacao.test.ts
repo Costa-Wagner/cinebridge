@@ -75,3 +75,39 @@ describe("SistemaRecomendacao", () => {
     erro.mockRestore();
   });
 }); 
+describe("SistemaRecomendacao: adaptadores e executarRecomendacao", () => {
+  it("falha com erro claro quando o adaptador nao foi configurado", () => {
+    const s = new SistemaRecomendacao();
+    expect(s.temAdaptadorProfissional()).toBe(false);
+    expect(() => s.obterAdaptadorArmazenamento()).toThrow("armazenamento");
+    expect(() => s.obterAdaptadorPagamento()).toThrow("pagamento");
+    expect(() => s.obterAdaptadorProfissional()).toThrow("profissional");
+  });
+
+  it("configurar troca so' o adaptador informado", () => {
+    const s = new SistemaRecomendacao();
+    const a1 = { efetuarPagamento: jest.fn() } as never;
+    const a2 = { efetuarPagamento: jest.fn() } as never;
+    const armazenamento = {} as never;
+    s.configurarAdaptadores({ pagamento: a1, armazenamento });
+    s.configurarAdaptadores({ pagamento: a2 });
+    expect(s.obterAdaptadorPagamento()).toBe(a2);
+    expect(s.obterAdaptadorArmazenamento()).toBe(armazenamento);
+  });
+
+  it("obtem candidatos pelo adaptador (papeis do projeto ou informados) e exclui ids", async () => {
+    const s = new SistemaRecomendacao();
+    const listar = jest.fn(async () => [{ id: "1" }, { id: "2" }]);
+    s.configurarAdaptadores({ profissional: { listarProfissionais: listar } as never });
+    const recomendar = jest.spyOn(s, "recomendar").mockReturnValue("equipe" as never);
+    const projeto = { papeisObrigatorios: [{ papel: "DIRETOR", peso: 1 }] } as never;
+
+    await s.executarRecomendacao(projeto);
+    expect(listar).toHaveBeenLastCalledWith({ papeis: ["DIRETOR"] });
+    expect(recomendar).toHaveBeenLastCalledWith(projeto, [{ id: "1" }, { id: "2" }], undefined, undefined);
+
+    await s.executarRecomendacao(projeto, { papeis: ["EDITOR"] as never, excluir: new Set(["1"]) });
+    expect(listar).toHaveBeenLastCalledWith({ papeis: ["EDITOR"] });
+    expect(recomendar).toHaveBeenLastCalledWith(projeto, [{ id: "2" }], undefined, ["EDITOR"]);
+  });
+});

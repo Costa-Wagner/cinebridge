@@ -3,6 +3,7 @@ import { SistemaRecomendacao } from "../observers/SistemaRecomendacao";
 import { TipoEvento } from "../observers/TipoEvento";
 import { DadosProjeto } from "../fabricas/FabricaProjeto";
 import { TipoCaptacao } from "../domain/enums/TipoCaptacao";
+import { RecomendacaoStrategy } from "../strategies/RecomendacaoStrategy";
 import { Papel } from "../domain/enums/Papel";
 import { StatusConvite } from "../domain/enums/StatusConvite";
 import { StatusEquipe } from "../domain/enums/StatusEquipe";
@@ -14,6 +15,8 @@ import { MembroEquipe } from "../domain/entities/MembroEquipe";
 import { Convite } from "../domain/entities/Convite";
 import { Recomendacao } from "../domain/entities/Recomendacao";
 import { CatalogoProfissionais } from "./CatalogoProfissionais";
+import { ConfiguracaoDecoradores } from "../decoradores/PilhaDecoradores";
+import { AdaptadorInterno } from "../adaptadores/profissional/AdaptadorInterno";
 
 const RELACOES_EQUIPE = ["equipe", "equipe.membros", "equipe.membros.profissional", "equipe.membros.convite"];
 
@@ -29,9 +32,13 @@ export class ServicoProjetos {
   constructor(
     private readonly dataSource: DataSource,
     private readonly sistema: SistemaRecomendacao,
-    catalogo?: CatalogoProfissionais
+    catalogo?: CatalogoProfissionais,
+    readonly decoradores: ConfiguracaoDecoradores = new ConfiguracaoDecoradores()
   ) {
     this.catalogo = catalogo ?? new CatalogoProfissionais(dataSource);
+    if (!sistema.temAdaptadorProfissional()) {
+      sistema.configurarAdaptadores({ profissional: new AdaptadorInterno(this.catalogo, dataSource) });
+    }
   }
 
   /** Carrega o cadastro de profissionais antes da primeira requisicao (usado na subida do servidor). */
@@ -48,7 +55,7 @@ export class ServicoProjetos {
    * Primeira recomendacao do projeto. Se ja existe uma equipe sem convites,
    * ela e' substituida; com convites em andamento use `reavaliar`.
    */
-  async recomendar(projetoId: string): Promise<Equipe | null> {
+  async recomendar(projetoId: string, preferencias: { decoradores?: string[] } = {}): Promise<Equipe | null> {
     // caminho quente: sem carregar a arvore equipe/membros/convites (so' interessa se ha convites)
     const projeto = await this.dataSource.getRepository(Projeto).findOneBy({ id: projetoId });
     if (!projeto) return null;
@@ -56,9 +63,9 @@ export class ServicoProjetos {
       throw new OperacaoInvalidaError("Equipe ja tem convites em andamento; use a reavaliacao");
     }
 
-    const papeis = projeto.papeisObrigatorios.map((p) => p.papel as Papel);
-    const profissionais = await this.catalogo.preSelecionar(papeis);
-    const equipe = this.sistema.recomendar(projeto, profissionais);
+    const equipe = await this.sistema.executarRecomendacao(projeto, {
+      estrategia: this.estrategiaConfigurada(projeto, preferencias.decoradores)
+    });
 
     // gravacao em lote (INSERTs diretos): e' uma equipe nova, sem nada a comparar com o banco
     await this.dataSource.transaction(async (manager) => {
@@ -240,10 +247,9 @@ export class ServicoProjetos {
     const novos: MembroEquipe[] = [];
     const rodadas: Equipe[] = [];
     for (const papel of papeis) {
-      const todos = await this.catalogo.preSelecionar([papel]);
-      const dispensados = new Set((projeto.rejeitados ?? []).filter((r) => r.papel === papel).map((r) => r.profissionalId));
-      const candidatos = todos.filter((p) => !ocupados.has(p.id) && !dispensados.has(p.id));
-      const rodada = this.sistema.recomendar(projeto, candidatos, undefined, [papel]);
+      const dispensados = (projeto.rejeitados ?? []).filter((r) => r.papel === papel).map((r) => r.profissionalId);
+      const excluir = new Set([...ocupados, ...dispensados]);
+      const rodada = await this.sistema.executarRecomendacao(projeto, { papeis: [papel], excluir, estrategia: this.estrategiaConfigurada(projeto) });
       rodadas.push(rodada);
       for (const membro of rodada.membros) {
         ocupados.add(membro.profissional.id);
@@ -291,5 +297,11 @@ export class ServicoProjetos {
     const ordem = projeto.papeisObrigatorios.map((p) => p.papel as string);
     equipe.membros.sort((a, b) => ordem.indexOf(a.papel) - ordem.indexOf(b.papel));
     return equipe;
+  }
+
+  /** Recomendador do tipo do projeto envolvido pela pilha de decoradores vigente (undefined = sem decoradores). */
+  private estrategiaConfigurada(projeto: Projeto, sobrepor?: string[]): RecomendacaoStrategy | undefined {
+    const base = this.sistema.obterFabrica(projeto.tipoCaptacao).criarRecomendador();
+    return this.decoradores.decorar(base, sobrepor);
   }
 }

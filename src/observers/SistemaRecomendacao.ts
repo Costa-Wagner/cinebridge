@@ -11,6 +11,24 @@ import { Projeto } from "../domain/entities/Projeto";
 import { Profissional } from "../domain/entities/Profissional";
 import { Equipe } from "../domain/entities/Equipe";
 import { RecomendacaoStrategy } from "../strategies/RecomendacaoStrategy";
+import { AdaptadorArmazenamento } from "../adaptadores/armazenamento/AdaptadorArmazenamento";
+import { AdaptadorPagamento } from "../adaptadores/pagamento/AdaptadorPagamento";
+import { AdaptadorProfissional } from "../adaptadores/profissional/AdaptadorProfissional";
+import { AdaptadorNaoConfiguradoError } from "../adaptadores/AdaptadorNaoConfiguradoError";
+
+export interface Adaptadores {
+  armazenamento?: AdaptadorArmazenamento;
+  pagamento?: AdaptadorPagamento;
+  profissional?: AdaptadorProfissional;
+}
+
+export interface OpcoesRecomendacao {
+  estrategia?: RecomendacaoStrategy;
+  /** Papeis a recomendar; padrao: todos os papeis obrigatorios do projeto. */
+  papeis?: Papel[];
+  /** Ids de profissionais que nao podem ser candidatos (ja alocados ou dispensados). */
+  excluir?: ReadonlySet<string>;
+}
 
 /**
  * Ponto de entrada das solicitacoes de recomendacao e, ao mesmo tempo, o
@@ -23,7 +41,45 @@ export class SistemaRecomendacao implements Publicador {
   private readonly observadores: Observador[] = [];
   private readonly fabricas = new Map<TipoCaptacao, FabricaProjeto>();
 
+  private adaptadorArmazenamento?: AdaptadorArmazenamento;
+  private adaptadorPagamento?: AdaptadorPagamento;
+  private adaptadorProfissional?: AdaptadorProfissional;
+
   constructor(private readonly limiteCandidatos: number = 5) {}
+
+  /** Injeta (ou troca) os adaptadores; so' os informados sao alterados. */
+  configurarAdaptadores(adaptadores: Adaptadores): void {
+    if (adaptadores.armazenamento) this.adaptadorArmazenamento = adaptadores.armazenamento;
+    if (adaptadores.pagamento) this.adaptadorPagamento = adaptadores.pagamento;
+    if (adaptadores.profissional) this.adaptadorProfissional = adaptadores.profissional;
+  }
+
+  temAdaptadorProfissional(): boolean {
+    return this.adaptadorProfissional !== undefined;
+  }
+
+  obterAdaptadorArmazenamento(): AdaptadorArmazenamento {
+    if (!this.adaptadorArmazenamento) throw new AdaptadorNaoConfiguradoError("armazenamento");
+    return this.adaptadorArmazenamento;
+  }
+
+  obterAdaptadorPagamento(): AdaptadorPagamento {
+    if (!this.adaptadorPagamento) throw new AdaptadorNaoConfiguradoError("pagamento");
+    return this.adaptadorPagamento;
+  }
+
+  obterAdaptadorProfissional(): AdaptadorProfissional {
+    if (!this.adaptadorProfissional) throw new AdaptadorNaoConfiguradoError("profissional");
+    return this.adaptadorProfissional;
+  }
+
+  /** Obtem os candidatos pelo AdaptadorProfissional (qualquer provedor) e orquestra a equipe. */
+  async executarRecomendacao(projeto: Projeto, opcoes: OpcoesRecomendacao = {}): Promise<Equipe> {
+    const papeis = opcoes.papeis ?? projeto.papeisObrigatorios.map((p) => p.papel as Papel);
+    const todos = await this.obterAdaptadorProfissional().listarProfissionais({ papeis });
+    const candidatos = opcoes.excluir ? todos.filter((p) => !opcoes.excluir!.has(p.id)) : todos;
+    return this.recomendar(projeto, candidatos, opcoes.estrategia, opcoes.papeis);
+  }
 
   registrarFabrica(tipo: TipoCaptacao, fabrica: FabricaProjeto): void {
     this.fabricas.set(tipo, fabrica);

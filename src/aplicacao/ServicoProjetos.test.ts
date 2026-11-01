@@ -16,6 +16,10 @@ import { Papel } from "../domain/enums/Papel";
 import { StatusConvite } from "../domain/enums/StatusConvite";
 import { StatusEquipe } from "../domain/enums/StatusEquipe";
 import { TipoCaptacao } from "../domain/enums/TipoCaptacao";
+import { ConfiguracaoDecoradores } from "../decoradores/PilhaDecoradores";
+import { CacheDecorator } from "../decoradores/CacheDecorator";
+import { AuditoriaDecorator } from "../decoradores/AuditoriaDecorator";
+import { nomeDaEstrategia } from "../decoradores/RecomendacaoDecorator";
 
 /**
  * Testes unitarios do servico com um DataSource de mentira (em memoria):
@@ -166,7 +170,7 @@ describe("ServicoProjetos.recomendar e buscarEquipe", () => {
 
     expect(equipe).toBe(nova);
     expect(catalogo.preSelecionar).toHaveBeenCalledWith([Papel.DIRETOR, Papel.EDITOR]);
-    expect(recomendar).toHaveBeenCalledWith(projeto, [ana, bruno]);
+    expect(recomendar).toHaveBeenCalledWith(projeto, [ana, bruno], undefined, undefined);
     expect(manager.insert).toHaveBeenCalledWith(Equipe, nova);
     expect(manager.insert).toHaveBeenCalledWith(MembroEquipe, nova.membros);
     expect(nova.membros.every((m) => m.equipe === nova)).toBe(true);
@@ -398,5 +402,38 @@ describe("ServicoProjetos: historico de recomendacoes", () => {
     const { servico } = montar({ projeto: criarProjeto(), recomendacoes: historico });
 
     expect(await servico.listarRecomendacoes("proj-1")).toEqual(historico);
+  });
+});
+
+describe("ServicoProjetos: pilha de decoradores", () => {
+  const preparar = (pilha?: string) => {
+    const montado = montar({ projeto: criarProjeto(), profissionais: [ana, bruno] });
+    if (pilha !== undefined) montado.servico.decoradores.definir(pilha);
+    const executar = jest.spyOn(montado.sistema, "executarRecomendacao");
+    return { ...montado, executar };
+  };
+
+  it("sem pilha configurada, recomenda sem decoradores", async () => {
+    const { servico, executar } = preparar();
+    await servico.recomendar("x");
+    expect(executar).toHaveBeenCalledWith(expect.anything(), { estrategia: undefined });
+  });
+
+  it("com pilha configurada, entrega ao sistema o recomendador do tipo decorado", async () => {
+    const { servico, executar } = preparar("CACHE,AUDITORIA");
+    const equipe = await servico.recomendar("x");
+    const { estrategia } = executar.mock.calls[0][1] as { estrategia: unknown };
+    expect(estrategia).toBeInstanceOf(AuditoriaDecorator);
+    expect((estrategia as AuditoriaDecorator).interno).toBeInstanceOf(CacheDecorator);
+    expect(nomeDaEstrategia(estrategia as AuditoriaDecorator)).toBe("RecomendadorDocumentario");
+    expect(equipe!.estrategia).toBe("RecomendadorDocumentario");
+  });
+
+  it("a preferencia da chamada sobrepoe a pilha global", async () => {
+    const { servico, executar } = preparar("CACHE");
+    await servico.recomendar("x", { decoradores: ["AUDITORIA"] });
+    const { estrategia } = executar.mock.calls[0][1] as { estrategia: unknown };
+    expect(estrategia).toBeInstanceOf(AuditoriaDecorator);
+    expect(servico.decoradores).toBeInstanceOf(ConfiguracaoDecoradores);
   });
 });

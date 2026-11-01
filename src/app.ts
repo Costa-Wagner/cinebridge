@@ -2,6 +2,7 @@ import Fastify, { FastifyInstance } from "fastify";
 import { ServicoProjetos } from "./aplicacao/ServicoProjetos";
 import { ProjetoInvalidoError } from "./orquestrador/ProjetoInvalidoError";
 import { TipoSemFabricaError } from "./fabricas/TipoSemFabricaError";
+import { DECORADORES, PilhaInvalidaError } from "./decoradores/PilhaDecoradores";
 import { OperacaoInvalidaError } from "./domain/erros";
 import { TipoCaptacao } from "./domain/enums/TipoCaptacao";
 import { Papel } from "./domain/enums/Papel";
@@ -43,6 +44,7 @@ const schemaCriarProjeto = {
       orcamentoTotal: { type: "number" },
       dataEntrega: { type: "string", format: "date" },
       localizacaoFilmagem: { type: "string" },
+      servicoPrincipal: { type: "object" },
       papeisObrigatorios: {
         type: "array",
         items: {
@@ -54,6 +56,10 @@ const schemaCriarProjeto = {
     }
   }
 };
+
+const listaDecoradores = { type: "array", items: { type: "string" } };
+const schemaPilha = { body: { type: "object", required: ["pilha"], properties: { pilha: listaDecoradores } } };
+const schemaRecomendar = { type: ["object", "null"], properties: { decoradores: listaDecoradores } };
 
 const schemaId = { params: { type: "object", properties: { id: { type: "string", format: "uuid" } } } };
 
@@ -92,6 +98,9 @@ export function criarApp(servico: ServicoProjetos, opcoes: { logger?: boolean } 
     if (erro instanceof TipoSemFabricaError) {
       return reply.status(422).send({ erro: erro.message });
     }
+    if (erro instanceof PilhaInvalidaError) {
+      return reply.status(400).send({ erro: erro.message });
+    }
     if (erro instanceof OperacaoInvalidaError) {
       return reply.status(409).send({ erro: erro.message });
     }
@@ -110,8 +119,18 @@ export function criarApp(servico: ServicoProjetos, opcoes: { logger?: boolean } 
     return reply.status(201).send(projeto);
   });
 
-  app.post<{ Params: { id: string } }>("/projetos/:id/recomendar", { schema: schemaId }, async (request, reply) => {
-    const equipe = await servico.recomendar(request.params.id);
+  app.get("/configuracao/decoradores", async () => ({ pilha: servico.decoradores.obter(), disponiveis: DECORADORES }));
+
+  app.put<{ Body: { pilha: string[] } }>("/configuracao/decoradores", { schema: schemaPilha }, async (request) => {
+    servico.decoradores.definir(request.body.pilha);
+    return { pilha: servico.decoradores.obter() };
+  });
+
+  app.post<{ Params: { id: string }; Body: { decoradores?: string[] } | null }>(
+    "/projetos/:id/recomendar",
+    { schema: { ...schemaId, body: schemaRecomendar } },
+    async (request, reply) => {
+    const equipe = await servico.recomendar(request.params.id, { decoradores: request.body?.decoradores });
     if (!equipe) return reply.status(404).send({ erro: "Projeto não encontrado" });
     return reply.send({
       ...resumoEquipe(equipe),

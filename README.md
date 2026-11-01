@@ -1,6 +1,6 @@
 # 📚 DSM – Desenvolvimento de Software Multiplataforma – FATEC/SJC
 
-Atividades práticas **ATV1** e **ATV2** – TP.II - Técnicas de Programação II · Prof. Dr. Eng. Gerson Penha.
+Atividades práticas **ATV1**, **ATV2** e **ATV3** – TP.II - Técnicas de Programação II · Prof. Dr. Eng. Gerson Penha.
 
 # 🎬 CineBridge – Recomendação e Orquestração de Equipes
 
@@ -8,7 +8,7 @@ Microsserviço REST que recebe as especificações técnicas de um projeto audio
 
 Suporta **documentário, animação e publicitário**, cada um com a sua família de objetos (projeto, validador, recomendador e notificador). Depois da recomendação, o produtor convida os membros propostos, os profissionais respondem, e a equipe pode ser reavaliada ou ter membros substituídos; quando todos os papéis confirmam, a equipe é formada e os outros microsserviços são avisados.
 
-> Série de exercícios que incrementam este mesmo projeto ao longo do semestre. A **ATV1** aplicou padrões comportamentais (Strategy, Template Method, Observer, Visitor); a **ATV2** acrescentou os criacionais (Prototype, Abstract Factory) sobre a mesma base. O histórico está no Git: tag `av1-entrega` (entrega da ATV1) e branch `atv2`.
+> Série de exercícios que incrementam este mesmo projeto ao longo do semestre. A **ATV1** aplicou padrões comportamentais (Strategy, Template Method, Observer, Visitor); a **ATV2** acrescentou os criacionais (Prototype, Abstract Factory) sobre a mesma base; a **ATV3** acrescentou os estruturais (Adapter, Composite, Decorator) e a [análise de anti-padrões](docs/anti-padroes.md). O histórico está no Git: tags `av1-entrega` e `av2-entrega`, branches `atv2` e `atv3`.
 
 ## 📑 Sumário
 
@@ -107,10 +107,13 @@ src/
 │   ├── entities/    # Projeto (+ 3 subclasses), Profissional, Equipe, MembroEquipe, Convite, Recomendacao...
 │   ├── enums/       # Papel, StatusConvite, StatusEquipe, TipoCaptacao
 │   ├── prototipos/  # RegistroPrototipos
+│   ├── servicos/    # Composite: ServicoProjeto, ServicoAtomico, PacoteServico
 │   └── erros.ts
 ├── fabricas/        # FabricaProjeto + famílias documentario/, animacao/, publicitario/
 ├── strategies/      # PontuacaoStrategy (algoritmos) + RecomendacaoStrategy (contrato do diagrama)
 ├── orquestrador/    # Template Method (OrquestradorEquipe / OrquestradorPadrao)
+├── adaptadores/     # Adapter: armazenamento, pagamento, profissional + sistemas externos simulados
+├── decoradores/     # Decorator: cache, auditoria, compressão e a pilha configurável
 ├── observers/       # Observer: SistemaRecomendacao (sujeito) e observadores
 ├── visitors/        # Visitor: validação, compatibilidade, relatório
 ├── eventos/         # Barramento de eventos entre microsserviços (EventEmitter)
@@ -151,6 +154,20 @@ flowchart TD
 | **Visitor** | `visitors/` | `ValidadorConsistencia` e os validadores por tipo (criados pela fábrica) rodam em toda criação e orquestração via `projeto.aceitar(validador)`; `CalculadorCompatibilidade` e `GeradorRelatorio` operam sobre as mesmas entidades sem alterá-las |
 | **Prototype** | `domain/entities/Projeto*.ts`, `domain/prototipos/` | `Projeto.clonar()` (cópia profunda, sem id nem relações) e `RegistroPrototipos`; cada fábrica guarda o modelo do seu tipo |
 | **Abstract Factory** | `fabricas/` | `FabricaProjeto` cria a família completa de cada tipo; o orquestrador e o `SistemaRecomendacao` não conhecem nenhum tipo concreto (um teste automatizado verifica isso) |
+| **Adapter** | `adaptadores/` | `AdaptadorArmazenamento` (S3, Google Cloud, Local), `AdaptadorPagamento` (Stripe, PagSeguro, PayPal) e `AdaptadorProfissional` (LinkedIn, Indeed, Interno) sobre sistemas externos simulados em `adaptadores/externos/`. `SistemaRecomendacao.configurarAdaptadores()` recebe as instâncias; trocar de provedor é trocar a instância. O `AdaptadorInterno` usa o `CatalogoProfissionais` |
+| **Composite** | `domain/servicos/` | `ServicoProjeto` (`calcularCusto`, `listarSubservicos`, `obterPrazo`, `validar`), `ServicoAtomico` e `PacoteServico` (prazo `SEQUENCIAL` ou `PARALELO`). `Projeto.servicoPrincipal` (jsonb) guarda a árvore; `papeisObrigatorios` é derivado das folhas |
+| **Decorator** | `decoradores/` | `CacheDecorator`, `AuditoriaDecorator` e `CompressaoDecorator` envolvem qualquer `RecomendacaoStrategy` (base: `RecomendadorBase`). A pilha é configurável em tempo de execução (ver abaixo) |
+
+**Composite na API:** `POST /projetos` aceita `servicoPrincipal` (árvore em JSON com `tipo: "ATOMICO" | "PACOTE"`); ele tem precedência sobre `papeisObrigatorios`. Sem ele, cada papel vira um serviço atômico de custo 0 e prazo de 1 dia.
+
+```json
+{ "tipo": "PACOTE", "nome": "Pós-produção", "modo": "SEQUENCIAL", "servicos": [
+  { "tipo": "ATOMICO", "nome": "Edição", "papel": "EDITOR", "peso": 8, "custo": 4000, "prazoDias": 10 },
+  { "tipo": "PACOTE", "nome": "Áudio", "modo": "PARALELO", "servicos": [
+    { "tipo": "ATOMICO", "nome": "Mixagem", "papel": "SONOPLASTA", "peso": 6, "custo": 2500, "prazoDias": 6 } ] } ] }
+```
+
+**Pilha de decoradores:** a lista é a ordem de aplicação (o último nome é a camada externa). Três formas de configurar: variável `DECORADORES` (padrão `CACHE`), `PUT /configuracao/decoradores` (`{"pilha": ["CACHE","AUDITORIA","COMPRESSAO"]}`, vale para as próximas recomendações) e `{"decoradores": [...]}` no corpo de `POST /projetos/:id/recomendar` (só para aquela chamada). O cache tem validade de 30 s: uma nova avaliação só aparece no ranking depois disso.
 
 **Famílias por tipo** (premissas de domínio):
 
@@ -211,6 +228,8 @@ recomendar ──► equipe EM_FORMACAO, membros PROPOSTOS
 | POST | `/projetos` | Cria um projeto pela fábrica do `tipoCaptacao` | 201, 400, 422 |
 | POST | `/projetos/:id/recomendar` | Recomenda e grava a equipe proposta (+ alternativas por papel) | 200, 404, 409, 422 |
 | GET | `/projetos/:id/equipe` | Equipe atual com a situação de cada membro | 200, 404 |
+| GET | `/configuracao/decoradores` | Pilha de decoradores vigente e as opções | 200 |
+| PUT | `/configuracao/decoradores` | Troca a pilha em tempo de execução (`{"pilha": [...]}`) | 200, 400 |
 | GET | `/projetos/:id/recomendacoes` | Histórico de rankings por papel (todas as rodadas) | 200, 404 |
 | POST | `/projetos/:id/equipe/aceitar` | Produtor aprova um membro: cria o convite | 201, 404, 409 |
 | POST | `/projetos/:id/equipe/substituir` | Produtor dispensa um membro e refaz só aquele papel | 200, 404, 409 |
@@ -247,6 +266,7 @@ curl -X POST http://localhost:3000/convites/<conviteId>/responder -H "content-ty
 | `DB_PASSWORD` | Senha do Postgres | `postgres` |
 | `DB_NAME` | Nome do banco | `cinebridge` |
 | `PORT` | Porta do servidor Fastify | `3000` |
+| `DECORADORES` | Pilha de decoradores da recomendação, em ordem de aplicação (`CACHE`, `AUDITORIA`, `COMPRESSAO`; vazio = nenhum) | `CACHE` |
 
 Opcionais (testes): `DB_NAME_TEST` (padrão `cinebridge_test`) e `DB_NAME_CARGA` (padrão `cinebridge_carga`). Os testes de integração e de carga criam esses bancos sozinhos e **nunca tocam no banco de desenvolvimento**. O `docker-compose.yml` lê as variáveis do `.env`.
 
@@ -261,8 +281,8 @@ npm run carga             # teste de carga do requisito de desempenho (exige o P
 
 | Nível | Quantidade | O que cobre |
 |---|---|---|
-| Unitários | **220 testes, 25 suítes** — 100% das linhas e dos *statements*, ~95% dos ramos | Strategies, Template Method (incl. invariância do fluxo), Observer (incl. isolamento de falhas), Visitor, Prototype, fábricas, domínio do fluxo de convite, serviço, API e catálogo |
-| Integração | **25 testes, 2 suítes** | API → serviço → Postgres: criação por tipo, equipes consistentes com o tipo, notificações por tipo, persistência e substituição da equipe, troca de strategy alterando o resultado, Visitor sobre as mesmas entidades, fluxo completo de convites até a equipe formada (com evento externo), histórico de recomendações |
+| Unitários | **317 testes, 31 suítes** — 100% das linhas e dos *statements*, ~96% dos ramos | Strategies, Template Method (incl. invariância do fluxo), Observer (incl. isolamento de falhas), Visitor, Prototype, fábricas, domínio do fluxo de convite, serviço, API e catálogo; Adapter (9 adaptadores), Composite (árvores de vários níveis) e Decorator (cache, auditoria, compressão e pilhas em ordens diferentes) |
+| Integração | **47 testes, 5 suítes** | Adapter: troca de armazenamento, pagamento e fonte de profissionais sem alterar o código de negócio; Composite: árvore persistida e reidratada; Decorator: cache evita recálculo, auditoria registra, pilha trocada por API. Além disso: API → serviço → Postgres: criação por tipo, equipes consistentes com o tipo, notificações por tipo, persistência e substituição da equipe, troca de strategy alterando o resultado, Visitor sobre as mesmas entidades, fluxo completo de convites até a equipe formada (com evento externo), histórico de recomendações |
 | Carga | 1 script | 10 mil profissionais, 100 requisições simultâneas (ver [Desempenho](#-desempenho)) |
 
 Os testes unitários usam fakes e rodam com o Docker parado. Entidades (`domain/entities/`), `config/`, `server.ts`, `composicao.ts` e `integracao/` ficam fora do cálculo de cobertura (`jest.config.js`) por serem decorators do TypeORM, *setup* e infraestrutura de teste; a lógica que usa as entidades é coberta pelos testes de domínio e de integração.
@@ -283,13 +303,17 @@ Duas decisões sustentam o requisito:
 | Ambiente | Custo por requisição | p95 (cadastro em memória) | Resultado |
 |---|---|---|---|
 | Referência: Ubuntu 24.04, Postgres 16 local | 8–10 ms | **0,75–0,97 s** | Atende |
-| Windows 10+, Docker Desktop, Postgres 18 | ~36 ms | **~3,6 s** | **Não atende** o limite de 2 s |
+| Referência com `CACHE` (padrão da ATV3) | 6,3 ms (era 8,0) | **0,62 s** (era 0,80 s) | Atende |
+| Windows 10+, Docker Desktop, Postgres 18 (ATV2) | ~36 ms | **~3,6 s** | **Não atende** o limite de 2 s |
+| Windows 10+, Docker Desktop, Postgres 18 (ATV3, sem decoradores no script) | 33,3 ms | **3,27 s** | **Não atende** o limite de 2 s |
 
 O Node executa o código da aplicação em uma única thread: com 100 requisições simultâneas, o tempo total é proporcional ao custo de processamento por requisição, e esse custo varia com a velocidade do processador. Na medição em Windows o banco não é o gargalo (ida e volta de ~1,4 ms); o custo de processamento é cerca de 3,5 vezes maior que no ambiente de referência. A rodada com cadastro "frio" (a primeira requisição lê os 10 mil profissionais) é só informativa: levou ~7,5 s no Windows, e por isso o servidor carrega o cadastro na subida.
 
+O script de carga usa a mesma pilha de decoradores do servidor (`DECORADORES`, padrão `CACHE`; `DECORADORES=` vazio mede sem decoradores). Em Windows o cache sozinho não leva o p95 a 2 s: o custo de processamento continua ~4 vezes o do ambiente de referência.
+
 O script imprime ao final um diagnóstico (ida e volta ao banco, uma requisição isolada e custo médio por requisição) para interpretar o resultado em qualquer máquina. Parâmetros: `PROFISSIONAIS`, `REQUISICOES`, `LIMITE_MS`; `DB_POOL` ajusta as conexões simultâneas com o banco (padrão 20).
 
-Caminhos para reduzir o custo em hardware mais lento: o `CacheDecorator` da ATV3 (evita recalcular recomendações repetidas) e executar mais de um processo Node (`cluster`), que usa todos os núcleos do processador.
+Caminhos para reduzir o custo em hardware mais lento: o `CacheDecorator` da ATV3 (evita recalcular recomendações repetidas; ativo por padrão em `DECORADORES=CACHE`, ganho medido no ambiente de referência: ~20% no custo por requisição, porque o ranking é só parte do custo; o restante é gravação no banco e serialização) e executar mais de um processo Node (`cluster`), que usa todos os núcleos do processador.
 
 ## 🔩 Scripts de demonstração manual
 
@@ -305,7 +329,9 @@ Diferente dos testes Jest, esses scripts executam contra o Postgres de desenvolv
 | Sistema | Situação |
 |---|---|
 | Windows 10+ | Desenvolvimento e testes (unitários e de integração) |
-| Ubuntu 24.04 | ATV1 validada ponta a ponta via WSL2; na ATV2, suítes unitária e de integração e o teste de carga executados em Ubuntu 24.04 nativo (com Postgres local) |
+| Ubuntu 24.04 | ATV1 validada ponta a ponta via WSL2; na ATV2 e na ATV3, suítes unitária e de integração executadas em Ubuntu 24.04 nativo (com Postgres local) |
+
+Os adaptadores e o `AdaptadorLocal` usam apenas `path`, `os` e `fs` do Node (separadores e pasta temporária do sistema); o diretório de mídia pode ser definido por `ARMAZENAMENTO_DIR`.
 
 ## 💾 Persistência de dados
 
@@ -320,13 +346,17 @@ Tabelas principais: `projetos` (tabela única para os três tipos), `profissiona
 - A comunicação entre serviços é em memória (`EventEmitter`); o barramento tem interface própria para trocar por RabbitMQ sem mudar quem publica. Gerenciamento de projetos e financeiro são consumidores simulados.
 - A pré-seleção por aderência é aproximada (ver [Desempenho](#-desempenho)).
 - A auditoria é um log JSON por evento; não há tabela de auditoria.
+- Os sistemas externos (S3, Google Cloud, gateways de pagamento, LinkedIn, Indeed) são **simulados em memória**; nenhum adaptador faz chamada de rede. Provedores externos não informam nível de competência: assume-se 7.
+- Nenhum fluxo de produção usa ainda os adaptadores de armazenamento e pagamento; eles ficam disponíveis no `SistemaRecomendacao` e são exercitados pelos testes de integração.
+- O `CompressaoDecorator` comprime e mede o resultado, mas o contrato `RecomendacaoStrategy` continua devolvendo o mapa original; o pacote gzip fica em `ultimoPacote`.
 - `CalculadorCompatibilidade` e `GeradorRelatorio` (Visitor) não têm rota HTTP; são exercitados por testes e pelo script `test:visitors`.
 
 ## 🎯 Conceitos aplicados
 
 - Node.js + TypeScript em modo estrito; Fastify e API REST (verbos, códigos de status e validação de esquema)
 - TypeORM: herança de tabela única (`@TableInheritance`/`@ChildEntity`), `jsonb`, relações e transações
-- Padrões de projeto: Strategy, Template Method, Observer, Visitor, Prototype, Abstract Factory
+- Padrões de projeto: Strategy, Template Method, Observer, Visitor, Prototype, Abstract Factory, Adapter, Composite, Decorator
+- Anti-padrões: análise do código e refatorações em [docs/anti-padroes.md](docs/anti-padroes.md)
 - Injeção de dependência explícita por construtor e raiz de composição (`composicao.ts`)
 - Testes unitários, de integração e de carga com Jest; cobertura de código
 - Comunicação entre serviços por eventos (`EventEmitter`)

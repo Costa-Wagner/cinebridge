@@ -11,6 +11,7 @@ import { TipoEvento } from "../observers/TipoEvento";
 import { EventoRecomendacao } from "../observers/EventoRecomendacao";
 import { StatusEquipe } from "../domain/enums/StatusEquipe";
 import { ProjetoInvalidoError } from "./ProjetoInvalidoError";
+import { nomeDaEstrategia } from "../decoradores/RecomendacaoDecorator";
 
 /**
  * Template Method: `orquestrar` fixa a ordem do fluxo (validar -> normalizar
@@ -108,7 +109,7 @@ export abstract class OrquestradorEquipe {
     const equipe = new Equipe();
     equipe.projeto = projeto;
     equipe.ranking = recomendacoes;
-    equipe.estrategia = estrategia.constructor.name;
+    equipe.estrategia = nomeDaEstrategia(estrategia);
     equipe.status = StatusEquipe.EM_FORMACAO;
     equipe.formadaEm = null;
     equipe.membros = [];
