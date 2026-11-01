@@ -8,13 +8,13 @@ Este documento registra a evidência dos testes automatizados (Jest) e o roteiro
 npm run test:coverage
 ```
 
-**Resultado atual (ATV2, `npm run test:coverage`):**
+**Resultado atual (ATV3, `npm run test:coverage`):**
 
 | Suítes | Testes | % Stmts | % Branch | % Funcs | % Lines |
 |---|---|---|---|---|---|
-| 25 passed | 220 passed | **100%** | **95.4%** | **100%** | **100%** |
+| 31 passed | 317 passed | **100%** | **96.1%** | **100%** | **100%** |
 
-Testes de integração (`npm run test:integration`, Postgres real): **2 suítes, 25 testes passando.**
+Testes de integração (`npm run test:integration`, Postgres real): **5 suítes, 47 testes passando** (ATV3: Adapter, Composite e Decorator em `adapter.integration.test.ts`, `composite.integration.test.ts` e `decoradores.integration.test.ts`).
 Teste de carga (`npm run carga`): ver seção "Teste de carga" abaixo.
 
 Threshold mínimo configurado (`jest.config.js`): **80%** em todas as métricas — atingido e ultrapassado.
