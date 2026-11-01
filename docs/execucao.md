@@ -23,8 +23,8 @@ Abra o **PowerShell**: menu Iniciar → digite "PowerShell" → Enter. Todos os 
 ### 2. Clonar o repositório
 
 ```powershell
-git clone https://github.com/SEU_USUARIO/cinebridge-atv1.git
-cd cinebridge-atv1
+git clone https://github.com/Costa-Wagner/cinebridge.git
+cd cinebridge
 ```
 
 ### 3. Instalar as dependências
@@ -105,6 +105,16 @@ Ou, com relatório de cobertura:
 npm run test:coverage
 ```
 
+Testes de integração (exigem o banco do passo 5 no ar; usam um banco próprio, `cinebridge_test`, criado automaticamente):
+```powershell
+npm run test:integration
+```
+
+Teste de carga do requisito de desempenho (10 mil profissionais, 100 requisições simultâneas):
+```powershell
+npm run carga
+```
+
 ---
 
 ## Ubuntu 24.04 (nativo ou via WSL2 no Windows)
@@ -146,8 +156,8 @@ npm --version
 Se estiver usando WSL2 sobre Windows, clone dentro do próprio sistema de arquivos do Linux (não em `/mnt/c/` ou `/mnt/d/`) — é bem mais rápido e evita problemas de permissão:
 ```bash
 cd ~
-git clone https://github.com/SEU_USUARIO/cinebridge-atv1.git
-cd cinebridge-atv1
+git clone https://github.com/Costa-Wagner/cinebridge.git
+cd cinebridge
 npm install
 ```
 

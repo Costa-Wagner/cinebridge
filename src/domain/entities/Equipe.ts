@@ -37,4 +37,7 @@ export class Equipe {
 
   /** Nao persistido: ranking completo por papel (o primeiro de cada lista e' o membro proposto). */
   ranking!: Map<Papel, Profissional[]>;
+
+  /** Nao persistido: nome do recomendador que gerou o ranking. */
+  estrategia!: string;
 }

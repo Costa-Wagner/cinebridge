@@ -78,6 +78,7 @@ describe("OrquestradorPadrao", () => {
 
     const equipe = new OrquestradorPadrao(fabrica).orquestrar(projeto, []);
 
+    expect(equipe.estrategia).toBe("RecomendadorDocumentario");
     expect(equipe.ranking.get(Papel.DIRETOR)).toEqual([]);
     expect(equipe.membros).toHaveLength(0);
   });

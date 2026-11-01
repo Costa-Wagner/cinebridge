@@ -8,15 +8,20 @@ Este documento registra a evidência dos testes automatizados (Jest) e o roteiro
 npm run test:coverage
 ```
 
-**Resultado final:**
+**Resultado atual (ATV2, `npm run test:coverage`):**
 
 | Suítes | Testes | % Stmts | % Branch | % Funcs | % Lines |
 |---|---|---|---|---|---|
-| 24 passed | 197 passed | **89.35%** | **83.92%** | **96.29%** | **89.39%** |
+| 25 passed | 220 passed | **100%** | **95.4%** | **100%** | **100%** |
 
-Threshold mínimo configurado (`jest.config.js`): **80%** em todas as métricas — todas as métricas atingidas e ultrapassadas.
+Testes de integração (`npm run test:integration`, Postgres real): **2 suítes, 25 testes passando.**
+Teste de carga (`npm run carga`): ver seção "Teste de carga" abaixo.
 
-**Output real do terminal — Windows** (`npm run test:coverage`):
+Threshold mínimo configurado (`jest.config.js`): **80%** em todas as métricas — atingido e ultrapassado.
+
+> Os blocos de saída bruta abaixo (Windows e Ubuntu) são a evidência registrada na ATV1, com 197 testes; mantidos como histórico de compatibilidade entre sistemas.
+
+**Output real do terminal — Windows** (`npm run test:coverage`, evidência anterior):
 
 ```
 -------------------------------|---------|----------|---------|---------|-------------------
@@ -102,28 +107,30 @@ Cobertura **idêntica** em ambos os sistemas (mesmas métricas, mesmas linhas de
 | Visitor | `CalculadorCompatibilidade.test.ts` | 7 |
 | Visitor | `GeradorRelatorio.test.ts` | 6 |
 
-Todos os testes são unitários (objetos fake/mock, sem dependência do Postgres) — rodam de forma determinística e independente do Docker estar ativo.
+Os testes unitários usam objetos fake/mock, sem dependência do Postgres — rodam de forma determinística e independente do Docker. Os testes de integração (`*.integration.test.ts`) usam um banco próprio (`cinebridge_test`), recriado a cada execução.
 
 **Entidades de domínio** (`domain/entities/`) e **arquivos de infraestrutura** (`config/`, `server.ts`, scripts manuais) foram excluídos do cálculo de cobertura por serem majoritariamente decorators do TypeORM e setup, sem lógica de negócio própria — decisão registrada em `jest.config.js` (`collectCoverageFrom`).
 
-> Não há teste de integração validando inserção real no Postgres (ex: `INSERT` de `Profissional`/`Projeto`) — essa cobertura hoje é feita manualmente, via `seed.ts` + verificação da rota (ver T02 abaixo). Decisão consciente, dado o prazo da entrega; ver seção "Limitações conhecidas" no fim deste documento.
+> Na ATV1 não havia teste de integração; na ATV2 foram acrescentados (`src/integracao/`): criação por tipo com gravação real, equipes consistentes com o tipo, notificações por tipo, substituição de equipe, fluxo completo de convites até a equipe formada, histórico de recomendações e Visitor sobre as mesmas entidades.
 
 ---
-## CatalogoProfissionais (performance)
+## Teste de carga
 
-A carga de profissionais deixou de usar `find({ relations })` do TypeORM
-(produto cartesiano com ~10k registros) e passou a usar a classe
-`CatalogoProfissionais` (`src/aplicacao/CatalogoProfissionais.ts`),
-integrada ao `ServicoProjetos`:
+Requisito: recomendações em até 2 s com até 10 mil profissionais ativos e 100 requisições simultâneas.
 
-- 4 queries simples + montagem manual em O(n)
-- cache em memória com TTL (padrão 60 s)
-- invalidação após aceitar / responder / substituir / reavaliar convites
+```bash
+npm run carga        # PROFISSIONAIS=10000 REQUISICOES=100 LIMITE_MS=2000 (padrões)
+```
 
-Última medição local: ~384 ms para 10k profissionais (cold), cache hit ~0 ms;
-cálculo de recomendação ~85–190 ms.
+O script cria o banco `cinebridge_carga`, gera os profissionais direto no banco, cria um projeto por requisição e dispara todas as recomendações ao mesmo tempo (API em memória, sem rede). Reprova se houver falha ou se o p95 com o cadastro em memória passar de `LIMITE_MS`.
 
-Após a integração: **197 testes unitários passando** (`npm test`).
+| Cenário | Antes (`find` com relações) | Depois (`CatalogoProfissionais` + pré-seleção) |
+|---|---|---|
+| 99 requisições simultâneas, 10 mil profissionais | processo Node encerrado por falta de memória | **p95 ≈ 0,8–1,0 s**, sem falhas |
+| Primeira requisição (cadastro frio) | — | informativo: ~2–2,5 s (a leitura do cadastro entra na conta) |
+| 100 requisições simultâneas, 10 mil profissionais (Windows 10+, Docker Desktop, Postgres 18) | — | **p95 ≈ 3,6 s** (custo ~36 ms por requisição); o limite de 2 s não é atendido neste hardware, ver README |
+
+Medições no ambiente de desenvolvimento (Ubuntu 24.04, Postgres local); o resultado depende do processador da máquina, e o script imprime um diagnóstico para interpretá-lo em outro computador. A rodada "fria" não é critério de aprovação porque o servidor carrega o cadastro na subida. Detalhes das decisões: seção "Desempenho" do README.
 
 ## Testes manuais (rota HTTP)
 
@@ -132,7 +139,7 @@ Ambiente: Postgres via `docker compose up -d`, banco populado via `npm run seed`
 | # | Passo | Requisição | Resultado esperado | Resultado obtido |
 |---|---|---|---|---|
 | T01 | Health check | `GET http://localhost:3000/health` | `200` — `{"status":"ok"}` | ✅ Conforme esperado |
-| T02 | Recomendação — fluxo feliz | `POST /projetos/{uuid}/recomendar` (projeto seedado, sem corpo) | `200` — JSON com `recomendacoes` (ranking por papel) e `convites` (1 por papel, sem repetição de profissional) | ✅ 6 convites gerados, um por papel, todos com o candidato de maior pontuação, sem reuso de profissional entre papéis |
+| T02 | Recomendação — fluxo feliz | `POST /projetos/{uuid}/recomendar` (projeto seedado, sem corpo) | `200` — JSON com `equipe` (1 membro proposto por papel, sem repetição de profissional) e `alternativas` por papel | ✅ ATV1: 6 convites, um por papel. ATV2: o contrato mudou (equipe proposta; convites só nascem quando o produtor aceita) e é verificado pelos testes de integração |
 | T03 | Corpo vazio com `Content-Type: application/json` (Thunder Client) | `POST /projetos/{uuid}/recomendar` com aba Body em "JSON" vazio | Erro `415 Unsupported Media Type` (Fastify não aceita corpo JSON vazio com header presente) | ✅ Erro reproduzido conforme esperado — corrigido enviando `{}` como corpo válido |
 | T04 | Recomendação — corpo corrigido | `POST /projetos/{uuid}/recomendar` com corpo `{}` | `200` — mesmo resultado de T02 | ✅ Conforme esperado |
 | T05 | Projeto inexistente | `POST /projetos/00000000-0000-0000-0000-000000000000/recomendar` | `404` — `{"erro":"Projeto não encontrado"}` | ✅ `HTTP/1.1 404 Not Found`, corpo de 34 bytes (compatível com o JSON esperado) |
@@ -160,5 +167,7 @@ Requisito do enunciado: *"Compatibilidade com Windows 10 ou superior, Ubuntu 24.
 
 ## Limitações conhecidas
 
-- Sem teste de integração real contra o Postgres (inserção de `Profissional`/`Projeto`) — cobertura manual apenas, via `seed.ts`.
-- Padrão Visitor não está integrado ao fluxo HTTP da rota `/recomendar` — validado isoladamente via `npm run test:visitors` (script manual) e via testes unitários (`ValidadorConsistencia`, `CalculadorCompatibilidade`, `GeradorRelatorio`), não via requisição HTTP real.
+- `Recomendacao.pontuacao` fica nula (o contrato do diagrama devolve só a ordem); posição e recomendador são gravados.
+- Os roteiros manuais T01–T05 foram executados na ATV1; na ATV2 o comportamento da rota é coberto pelos testes de integração automatizados.
+- `CalculadorCompatibilidade` e `GeradorRelatorio` (Visitor) não têm rota HTTP — validados por testes e por `npm run test:visitors`. O validador de consistência roda no fluxo (criação e orquestração).
+- A pré-seleção por aderência é aproximada (30 por papel).

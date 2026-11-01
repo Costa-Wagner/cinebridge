@@ -7,6 +7,18 @@ import { Convite } from "../domain/entities/Convite";
 import { Projeto } from "../domain/entities/Projeto";
 import { StatusConvite } from "../domain/enums/StatusConvite";
 import { Papel } from "../domain/enums/Papel";
+import { SimilaridadeCosseno } from "../strategies/SimilaridadeCosseno";
+import { ehCandidatoElegivel } from "../strategies/RecomendadorPorPontuacao";
+
+/** Quantos profissionais, por papel, seguem para a etapa de ranqueamento. */
+export const LIMITE_PRESELECAO = 30;
+
+interface Carga {
+  carregadoEm: number;
+  profissionais: Profissional[];
+  /** Para cada papel: os elegiveis, do mais aderente (cosseno) ao menos. */
+  aderenciaPorPapel: Map<Papel, Profissional[]>;
+}
 
 /**
  * Catalogo de profissionais com carga O(n) (queries simples + montagem manual),
@@ -14,30 +26,50 @@ import { Papel } from "../domain/enums/Papel";
  *
  * Substitui o `find({ relations })` do TypeORM, que gera produto cartesiano
  * e estoura memoria/tempo com ~10k registros.
+ *
+ * Requisicoes simultaneas esperam a mesma carga em andamento (uma unica
+ * leitura do banco) e, a cada carga, monta-se um indice de aderencia por
+ * papel para a pre-selecao (`preSelecionar`).
  */
 export class CatalogoProfissionais {
-  private cache: Profissional[] | null = null;
-  private carregadoEm = 0;
+  private cache: Carga | null = null;
+  private emCarga: Promise<Carga> | null = null;
+  private geracao = 0;
 
   constructor(
     private readonly dataSource: DataSource,
-    private readonly ttlMs: number = 60_000
+    private readonly ttlMs: number = 60_000,
+    private readonly agora: () => number = Date.now
   ) {}
 
   /** Retorna o catalogo (cache hit ou recarga completa). */
   async listar(): Promise<Profissional[]> {
-    if (this.cache && Date.now() - this.carregadoEm < this.ttlMs) {
-      return this.cache;
+    return (await this.obter()).profissionais;
+  }
+
+  /**
+   * Primeira etapa da recomendacao (geracao de candidatos): para cada papel,
+   * os `porPapel` profissionais mais aderentes ao perfil do papel. Cada tipo
+   * de projeto reordena depois essa lista curta com os seus proprios
+   * criterios (reputacao, orcamento, software...). O custo por requisicao
+   * deixa de crescer com o tamanho do cadastro.
+   */
+  async preSelecionar(papeis: Papel[], porPapel: number = LIMITE_PRESELECAO): Promise<Profissional[]> {
+    const { aderenciaPorPapel } = await this.obter();
+    const escolhidos = new Set<Profissional>();
+    for (const papel of papeis) {
+      for (const profissional of (aderenciaPorPapel.get(papel) ?? []).slice(0, porPapel)) {
+        escolhidos.add(profissional);
+      }
     }
-    this.cache = await this.carregar();
-    this.carregadoEm = Date.now();
-    return this.cache;
+    return [...escolhidos];
   }
 
   /** Descarta o cache (chamar apos aceitar/responder/substituir/reavaliar). */
   invalidar(): void {
     this.cache = null;
-    this.carregadoEm = 0;
+    this.emCarga = null;
+    this.geracao++; // uma carga que ja estava em andamento nao repovoa o cache com dados antigos
   }
 
   /** Forca recarga imediata (util em testes de carga). */
@@ -46,9 +78,28 @@ export class CatalogoProfissionais {
     return this.listar();
   }
 
+  private obter(): Promise<Carga> {
+    if (this.cache && this.agora() - this.cache.carregadoEm < this.ttlMs) {
+      return Promise.resolve(this.cache);
+    }
+    if (!this.emCarga) {
+      const geracao = this.geracao;
+      const carga: Promise<Carga> = this.carregar()
+        .then((resultado) => {
+          if (geracao === this.geracao) this.cache = resultado;
+          return resultado;
+        })
+        .finally(() => {
+          if (this.emCarga === carga) this.emCarga = null;
+        });
+      this.emCarga = carga;
+    }
+    return this.emCarga;
+  }
+
   // ---- carga O(n) ----
 
-  private async carregar(): Promise<Profissional[]> {
+  private async carregar(): Promise<Carga> {
     const [profissionais, vinculos, avaliacoes, convites] = await Promise.all([
       this.dataSource.query(
         `SELECT id, nome, email, especialidades, "precoBaseDiaria", disponibilidade, localizacao
@@ -130,7 +181,23 @@ export class CatalogoProfissionais {
       p.convites.push(cv);
     }
 
-    return [...porId.values()];
+    const profissionaisCarregados = [...porId.values()];
+    return {
+      carregadoEm: this.agora(),
+      profissionais: profissionaisCarregados,
+      aderenciaPorPapel: this.indexarAderencia(profissionaisCarregados)
+    };
+  }
+
+  private indexarAderencia(profissionais: Profissional[]): Map<Papel, Profissional[]> {
+    const cosseno = new SimilaridadeCosseno();
+    const indice = new Map<Papel, Profissional[]>();
+    for (const papel of Object.values(Papel)) {
+      const elegiveis = profissionais.filter((p) => ehCandidatoElegivel(p, papel));
+      const ranking = cosseno.recomendar({ projeto: {} as Projeto, papel, candidatos: elegiveis });
+      indice.set(papel, ranking.map((r) => r.profissional));
+    }
+    return indice;
   }
 
   private parseArray(valor: unknown): string[] {

@@ -145,7 +145,7 @@ describe("recomendacao consistente com o tipo do projeto", () => {
     // observadores compartilhados continuam reagindo, para qualquer tipo
     for (const linhasDoTipo of [doc, ani]) {
       expect(linhasDoTipo.some((l) => l.startsWith("[EMAIL]"))).toBe(true);
-      expect(linhasDoTipo.some((l) => l.startsWith("[AUDITORIA]"))).toBe(true);
+      expect(linhasDoTipo.some((l) => l.includes('"origem":"AUDITORIA"'))).toBe(true);
     }
   });
 

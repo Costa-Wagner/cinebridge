@@ -3,3 +3,9 @@ dist
 .env
 *.log
 coverage
+
+# temporarios do Word e arquivos de patch
+~$*
+~WRL*.tmp
+*.tmp
+*.patch

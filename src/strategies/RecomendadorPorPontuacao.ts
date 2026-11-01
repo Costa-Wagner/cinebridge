@@ -5,10 +5,21 @@ import { PERFIL_IDEAL_PAPEL } from "../config/perfilPapel";
 import { PontuacaoStrategy, ResultadoRecomendacao } from "./PontuacaoStrategy";
 import { RecomendacaoStrategy } from "./RecomendacaoStrategy";
 
+const competenciasPorPapel = new Map<Papel, Set<string>>();
+
+function competenciasDoPapel(papel: Papel): Set<string> {
+  let conjunto = competenciasPorPapel.get(papel);
+  if (!conjunto) {
+    conjunto = new Set(Object.keys(PERFIL_IDEAL_PAPEL[papel]));
+    competenciasPorPapel.set(papel, conjunto);
+  }
+  return conjunto;
+}
+
 export function ehCandidatoElegivel(profissional: Profissional, papel: Papel): boolean {
-  const competenciasDoPapel = new Set(Object.keys(PERFIL_IDEAL_PAPEL[papel]));
+  const competenciasDoPapelAlvo = competenciasDoPapel(papel);
   return (profissional.competencias ?? []).some((v) =>
-    competenciasDoPapel.has(v.competencia.nome)
+    competenciasDoPapelAlvo.has(v.competencia.nome)
   );
 }
 
