@@ -53,7 +53,7 @@ export abstract class OrquestradorEquipe {
     const alvo = papeis ? this.restringirPapeis(projeto, papeis) : projeto;
     const recomendacoes = this.posProcessar(estrategia.recomendar(alvo, disponiveis));
     this.notificar(projeto, recomendacoes);
-    return this.montarEquipe(projeto, recomendacoes);
+    return this.montarEquipe(projeto, recomendacoes, estrategia);
   }
 
   /** Passo variavel: o projeto pode ser orquestrado? */
@@ -100,10 +100,15 @@ export abstract class OrquestradorEquipe {
   }
 
   /** Passo fixo: o primeiro de cada papel vira membro proposto; o ranking completo fica na equipe. */
-  private montarEquipe(projeto: Projeto, recomendacoes: Map<Papel, Profissional[]>): Equipe {
+  private montarEquipe(
+    projeto: Projeto,
+    recomendacoes: Map<Papel, Profissional[]>,
+    estrategia: RecomendacaoStrategy
+  ): Equipe {
     const equipe = new Equipe();
     equipe.projeto = projeto;
     equipe.ranking = recomendacoes;
+    equipe.estrategia = estrategia.constructor.name;
     equipe.status = StatusEquipe.EM_FORMACAO;
     equipe.formadaEm = null;
     equipe.membros = [];

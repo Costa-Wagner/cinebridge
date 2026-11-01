@@ -30,8 +30,9 @@ export class Recomendacao {
   @Column({ type: "enum", enum: Papel })
   papel!: Papel;
 
-  @Column("decimal", { precision: 5, scale: 2 })
-  pontuacao!: number;
+  /** Nulo quando o recomendador nao informa pontuacao (o contrato do diagrama devolve so' a ordem). */
+  @Column("decimal", { precision: 5, scale: 2, nullable: true })
+  pontuacao!: number | null;
 
   @Column("int")
   posicaoRanking!: number;

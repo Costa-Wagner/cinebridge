@@ -66,6 +66,18 @@ async function novaEquipe(): Promise<{ id: string; membros: MembroJson[] }> {
   return { id, membros: equipe.json().membros };
 }
 
+/** Registros JSON da trilha de auditoria entre as linhas escritas no console. */
+function auditoria(saida: string[]): { origem: string; evento: string; projetoId: string; papel: string | null }[] {
+  return saida.flatMap((linha) => {
+    try {
+      const registro = JSON.parse(linha);
+      return registro?.origem === "AUDITORIA" ? [registro] : [];
+    } catch {
+      return [];
+    }
+  });
+}
+
 const membroDe = (membros: MembroJson[], papel: string) => membros.find((m) => m.papel === papel);
 
 async function equipeAtual(id: string) {
@@ -199,7 +211,7 @@ describe("resposta do profissional ao convite", () => {
     expect(formadas[0].membros).toHaveLength(5);
     expect(linhas.some((l) => l.startsWith("[GERENCIAMENTO_PROJETOS]"))).toBe(true);
     expect(linhas.some((l) => l.startsWith("[FINANCEIRO]"))).toBe(true);
-    expect(linhas.some((l) => l.startsWith("[AUDITORIA]") && l.includes("equipe_formada"))).toBe(true);
+    expect(auditoria(linhas).some((r) => r.evento === "EQUIPE_FORMADA" && r.projetoId === id)).toBe(true);
   });
 });
 
@@ -289,3 +301,34 @@ describe("reavaliacao", () => {
     expect(Number((await ds.getRepository(Projeto).findOneByOrFail({ id })).orcamentoTotal)).toBe(60000);
   });
 });
+
+describe("historico de recomendacoes", () => {
+  type Registro = { papel: string; posicao: number; estrategia: string; profissional: { id: string } };
+  const historico = async (id: string) => (await app.inject({ method: "GET", url: `/projetos/${id}/recomendacoes` })).json() as Registro[];
+
+  it("a primeira recomendacao grava o ranking de cada papel; substituir acrescenta so' o papel refeito", async () => {
+    const { id, membros } = await novaEquipe();
+    const inicial = await historico(id);
+
+    expect(inicial.length).toBeGreaterThanOrEqual(membros.length);
+    expect(new Set(inicial.map((r) => r.papel))).toEqual(new Set(membros.map((m) => m.papel)));
+    expect(inicial.every((r) => r.estrategia === "RecomendadorDocumentario")).toBe(true);
+    expect(inicial.filter((r) => r.papel === "DIRETOR").map((r) => r.posicao).sort()).toEqual(
+      inicial.filter((r) => r.papel === "DIRETOR").map((_, i) => i + 1)
+    );
+
+    const diretor = membroDe(membros, "DIRETOR")!;
+    await post(`/projetos/${id}/equipe/substituir`, { papel: "DIRETOR", profissionalId: diretor.profissional.id });
+    const depois = await historico(id);
+
+    expect(depois.length).toBeGreaterThan(inicial.length);
+    expect(depois.length - inicial.length).toBe(depois.filter((r) => r.papel === "DIRETOR").length - inicial.filter((r) => r.papel === "DIRETOR").length);
+  });
+
+  it("responde 404 para projeto inexistente", async () => {
+    const resposta = await app.inject({ method: "GET", url: "/projetos/11111111-1111-4111-8111-111111111111/recomendacoes" });
+
+    expect(resposta.statusCode).toBe(404);
+  });
+});
+

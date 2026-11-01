@@ -22,6 +22,8 @@ export const AppDataSource = new DataSource({
   database: process.env.DB_NAME ?? "cinebridge",
   synchronize: true,
   logging: false,
+  // conexoes simultaneas com o banco (o padrao do driver e' 10); ajustavel por DB_POOL
+  extra: { max: Number(process.env.DB_POOL ?? 20) },
   entities: [
     Projeto,
     ProjetoDocumentario,

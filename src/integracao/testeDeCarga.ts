@@ -71,6 +71,16 @@ async function principal(): Promise<void> {
     { nome: "cadastro frio, so' informativo (a primeira requisicao le o cadastro)", valeComoCriterio: false, resultado: await disparar() },
     { nome: "cadastro em memoria", valeComoCriterio: true, resultado: await disparar() }
   ];
+  // diagnostico: separa o custo do banco do custo de processamento nesta maquina
+  const pings: number[] = [];
+  for (let i = 0; i < 20; i++) {
+    const t = Date.now();
+    await ds.query("SELECT 1");
+    pings.push(Date.now() - t);
+  }
+  const unica = Date.now();
+  await app.inject({ method: "POST", url: `/projetos/${ids[0]}/recomendar`, payload: {} });
+  const tempoUnica = Date.now() - unica;
   console.log = logOriginal;
 
   let reprovado = false;
@@ -83,6 +93,13 @@ async function principal(): Promise<void> {
     );
     if (falhas > 0 || (valeComoCriterio && p95 > LIMITE_MS)) reprovado = true;
   }
+  const media = (pings.reduce((a, b) => a + b, 0) / pings.length).toFixed(1);
+  const quente = rodadas[1].resultado;
+  console.log(
+    `\nDiagnostico: ida e volta ao banco ${media} ms | 1 requisicao isolada ${tempoUnica} ms | ` +
+      `custo medio por requisicao na rodada quente ${(quente.total / REQUISICOES).toFixed(1)} ms ` +
+      `(o Node processa uma requisicao por vez, entao total ≈ requisicoes × custo por requisicao)`
+  );
   console.log(reprovado ? `\nREPROVADO: limite de ${LIMITE_MS} ms (p95) ou falhas.` : `\nAPROVADO: p95 dentro de ${LIMITE_MS} ms, sem falhas.`);
 
   await app.close();

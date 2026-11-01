@@ -9,6 +9,7 @@ import { Projeto } from "../domain/entities/Projeto";
 import { ProjetoDocumentario } from "../domain/entities/ProjetoDocumentario";
 import { Profissional } from "../domain/entities/Profissional";
 import { Convite } from "../domain/entities/Convite";
+import { Recomendacao } from "../domain/entities/Recomendacao";
 import { Equipe } from "../domain/entities/Equipe";
 import { MembroEquipe } from "../domain/entities/MembroEquipe";
 import { Papel } from "../domain/enums/Papel";
@@ -60,21 +61,41 @@ function criarProjeto(membros?: MembroEquipe[]): Projeto {
 }
 
 function parcial(...membros: MembroEquipe[]): Equipe {
-  return Object.assign(new Equipe(), { membros, ranking: new Map() });
+  return Object.assign(new Equipe(), { membros, ranking: new Map(), estrategia: "RecomendadorDocumentario" });
 }
 
-function montar(dados: { projeto?: Projeto | null; profissionais?: Profissional[]; convite?: Convite | null } = {}) {
+/** Equipe parcial com o ranking completo de um papel (o primeiro vira membro proposto). */
+function rodada(papel: Papel, ...ranking: Profissional[]): Equipe {
+  const equipe = parcial(membro(papel, ranking[0]));
+  equipe.ranking = new Map([[papel, ranking]]);
+  return equipe;
+}
+
+function montar(
+  dados: {
+    projeto?: Projeto | null;
+    profissionais?: Profissional[];
+    convite?: Convite | null;
+    recomendacoes?: Recomendacao[];
+    convitesEmAndamento?: boolean;
+  } = {}
+) {
   const manager = {
     save: jest.fn(async (entidade: unknown) => entidade),
+    insert: jest.fn(async () => undefined),
     createQueryBuilder: jest.fn(() => ({
       delete: () => ({ from: () => ({ where: () => ({ execute: jest.fn(async () => undefined) }) }) })
     }))
   };
   const dataSource = {
     manager,
+    query: jest.fn(async () => (dados.convitesEmAndamento ? [{ "?column?": 1 }] : [])),
     transaction: async (fn: (m: typeof manager) => Promise<void>) => fn(manager),
     getRepository: (alvo: unknown) => {
-      if (alvo === Projeto) return { findOne: async () => dados.projeto ?? null };
+      if (alvo === Projeto) {
+        return { findOne: async () => dados.projeto ?? null, findOneBy: async () => dados.projeto ?? null };
+      }
+      if (alvo === Recomendacao) return { find: jest.fn(async () => dados.recomendacoes ?? []) };
       if (alvo === Profissional) return { find: async () => dados.profissionais ?? [] };
       return { findOne: async () => dados.convite ?? null };
     }
@@ -130,7 +151,9 @@ describe("ServicoProjetos.recomendar e buscarEquipe", () => {
   it("recusa recomendar de novo quando ha convites em andamento", async () => {
     const projeto = criarProjeto([membro(Papel.DIRETOR, ana, { convite: convite("c1", StatusConvite.PENDENTE) })]);
 
-    await expect(montar({ projeto }).servico.recomendar("proj-1")).rejects.toThrow(OperacaoInvalidaError);
+    await expect(montar({ projeto, convitesEmAndamento: true }).servico.recomendar("proj-1")).rejects.toThrow(
+      OperacaoInvalidaError
+    );
   });
 
   it("substitui a equipe anterior (sem convites) pela nova", async () => {
@@ -144,7 +167,9 @@ describe("ServicoProjetos.recomendar e buscarEquipe", () => {
     expect(equipe).toBe(nova);
     expect(catalogo.preSelecionar).toHaveBeenCalledWith([Papel.DIRETOR, Papel.EDITOR]);
     expect(recomendar).toHaveBeenCalledWith(projeto, [ana, bruno]);
-    expect(manager.save).toHaveBeenCalledWith(nova);
+    expect(manager.insert).toHaveBeenCalledWith(Equipe, nova);
+    expect(manager.insert).toHaveBeenCalledWith(MembroEquipe, nova.membros);
+    expect(nova.membros.every((m) => m.equipe === nova)).toBe(true);
   });
 
   it("buscarEquipe: null sem projeto ou sem equipe; membros na ordem dos papeis do projeto", async () => {
@@ -316,5 +341,62 @@ describe("ServicoProjetos.reavaliar", () => {
 
     expect(recomendar).not.toHaveBeenCalled();
     expect(equipe!.membros).toHaveLength(2);
+  });
+});
+
+describe("ServicoProjetos: historico de recomendacoes", () => {
+  const registrosSalvos = (manager: { insert: jest.Mock }) =>
+    manager.insert.mock.calls.filter((c) => c[0] === Recomendacao).flatMap((c) => c[1] as Recomendacao[]);
+
+  it("a primeira recomendacao grava o ranking de cada papel com posicao e recomendador", async () => {
+    const projeto = criarProjeto();
+    const { servico, manager, recomendar } = montar({ projeto, profissionais: [ana, bruno] });
+    const equipe = rodada(Papel.DIRETOR, ana, bruno);
+    recomendar.mockReturnValue(equipe);
+
+    await servico.recomendar("proj-1");
+
+    expect(registrosSalvos(manager).map((r) => [r.papel, r.profissional.id, r.posicaoRanking, r.estrategiaUtilizada, r.pontuacao])).toEqual([
+      [Papel.DIRETOR, "1", 1, "RecomendadorDocumentario", null],
+      [Papel.DIRETOR, "2", 2, "RecomendadorDocumentario", null]
+    ]);
+    expect(registrosSalvos(manager)[0].projeto).toBe(projeto);
+  });
+
+  it("substituir grava so' a rodada do papel refeito", async () => {
+    const projeto = criarProjeto([membro(Papel.DIRETOR, ana), membro(Papel.EDITOR, bruno)]);
+    const { servico, manager, recomendar } = montar({ projeto, profissionais: [ana, bruno, carla] });
+    recomendar.mockReturnValue(rodada(Papel.DIRETOR, carla));
+
+    await servico.substituirMembro("proj-1", Papel.DIRETOR, "1");
+
+    expect(registrosSalvos(manager).map((r) => [r.papel, r.profissional.id, r.posicaoRanking])).toEqual([[Papel.DIRETOR, "3", 1]]);
+  });
+
+  it("reavaliar grava uma rodada por papel refeito; sem papeis a refazer, nada e' gravado", async () => {
+    const projeto = criarProjeto([membro(Papel.DIRETOR, ana), membro(Papel.EDITOR, bruno)]);
+    const { servico, manager, recomendar } = montar({ projeto, profissionais: [ana, bruno, carla, dani] });
+    recomendar.mockReturnValueOnce(rodada(Papel.DIRETOR, carla)).mockReturnValueOnce(rodada(Papel.EDITOR, dani));
+
+    await servico.reavaliar("proj-1");
+
+    expect(registrosSalvos(manager).map((r) => r.papel)).toEqual([Papel.DIRETOR, Papel.EDITOR]);
+
+    const todosConfirmados = criarProjeto([
+      membro(Papel.DIRETOR, ana, { aceitouConvite: true }),
+      membro(Papel.EDITOR, bruno, { aceitouConvite: true })
+    ]);
+    const outro = montar({ projeto: todosConfirmados, profissionais: [ana, bruno] });
+    await outro.servico.reavaliar("proj-1");
+    expect(registrosSalvos(outro.manager)).toEqual([]);
+  });
+
+  it("listarRecomendacoes: null para projeto inexistente; senao devolve o historico do repositorio", async () => {
+    expect(await montar({ projeto: null }).servico.listarRecomendacoes("x")).toBeNull();
+
+    const historico = [Object.assign(new Recomendacao(), { papel: Papel.DIRETOR, posicaoRanking: 1 })];
+    const { servico } = montar({ projeto: criarProjeto(), recomendacoes: historico });
+
+    expect(await servico.listarRecomendacoes("proj-1")).toEqual(historico);
   });
 });

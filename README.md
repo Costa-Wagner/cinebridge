@@ -1,14 +1,14 @@
 # 📚 DSM – Desenvolvimento de Software Multiplataforma – FATEC/SJC
 
-Atividade prática **ATV1** e **ATV2** – TP.II - Técnicas de Programação II · Prof. Dr. Eng. Gerson Penha.
+Atividades práticas **ATV1** e **ATV2** – TP.II - Técnicas de Programação II · Prof. Dr. Eng. Gerson Penha.
 
 # 🎬 CineBridge – Recomendação e Orquestração de Equipes
 
 Microsserviço REST que recebe as especificações técnicas de um projeto audiovisual, analisa o perfil dos profissionais cadastrados e compõe automaticamente uma equipe equilibrada — notificando os envolvidos e permitindo ajustes dinâmicos ao longo do processo.
 
-Suporta documentário, animação e publicitário. Depois da recomendação, o produtor aceita membros, os profissionais respondem aos convites e a equipe pode ser reavaliada ou ter membros substituídos. A carga de profissionais usa catálogo otimizado (consultas O(n) e cache) para escalar a dezenas de milhares de registros.
+Suporta **documentário, animação e publicitário**, cada um com a sua família de objetos (projeto, validador, recomendador e notificador). Depois da recomendação, o produtor convida os membros propostos, os profissionais respondem, e a equipe pode ser reavaliada ou ter membros substituídos; quando todos os papéis confirmam, a equipe é formada e os outros microsserviços são avisados.
 
-> Primeiro de uma série de exercícios que vão incrementar este mesmo projeto ao longo do semestre — a estrutura aqui documentada é a base sobre a qual as próximas entregas serão construídas.
+> Série de exercícios que incrementam este mesmo projeto ao longo do semestre. A **ATV1** aplicou padrões comportamentais (Strategy, Template Method, Observer, Visitor); a **ATV2** acrescentou os criacionais (Prototype, Abstract Factory) sobre a mesma base. O histórico está no Git: tag `av1-entrega` (entrega da ATV1) e branch `atv2`.
 
 ## 📑 Sumário
 
@@ -16,19 +16,23 @@ Suporta documentário, animação e publicitário. Depois da recomendação, o p
 - [🛠 Tecnologias](#-tecnologias)
 - [🚀 Como executar](#-como-executar)
 - [🗂 Estrutura do projeto](#-estrutura-do-projeto)
-- [🏗 Decisão de arquitetura — padrões de projeto aplicados](#-decisão-de-arquitetura--padrões-de-projeto-aplicados)
+- [🏗 Padrões de projeto aplicados](#-padrões-de-projeto-aplicados)
+- [📐 Mapeamento UML → código e premissas](#-mapeamento-uml--código-e-premissas)
+- [👥 Fluxo da equipe](#-fluxo-da-equipe)
 - [🖥 Endpoints](#-endpoints)
 - [🔧 Variáveis de ambiente](#-variáveis-de-ambiente)
 - [🧪 Testes](#-testes)
+- [⚡ Desempenho](#-desempenho)
 - [🔩 Scripts de demonstração manual](#-scripts-de-demonstração-manual)
 - [🖥 Compatibilidade](#-compatibilidade)
 - [💾 Persistência de dados](#-persistência-de-dados)
+- [⚠️ Limitações conhecidas](#️-limitações-conhecidas)
 - [🎯 Conceitos aplicados](#-conceitos-aplicados)
 
 ## 📋 Requisitos
 
 - Node.js (versão LTS)
-- Docker Desktop (o Postgres roda em container)
+- Docker Desktop com Docker Compose (o Postgres roda em container)
 
 ## 🛠 Tecnologias
 
@@ -53,7 +57,7 @@ Suporta documentário, animação e publicitário. Depois da recomendação, o p
 
 <p align="left">
 <a href="https://www.postgresql.org" target="_blank" rel="noopener noreferrer">
-<img src="https://img.shields.io/badge/PostgreSQL_16-4169E1?style=flat&logo=postgresql&logoColor=white" alt="PostgreSQL 16" height="25px">
+<img src="https://img.shields.io/badge/PostgreSQL_18-4169E1?style=flat&logo=postgresql&logoColor=white" alt="PostgreSQL 18" height="25px">
 </a>
 </p>
 
@@ -73,14 +77,14 @@ Suporta documentário, animação e publicitário. Depois da recomendação, o p
 </a>
 </p>
 
-Versões: Node.js LTS · TypeScript 5.5 (modo `strict`) · Fastify 4 · TypeORM 0.3 · Postgres 16 · Jest 30 + ts-jest.
+Versões: Node.js LTS · TypeScript 5.5 (modo `strict`) · Fastify 4 · TypeORM 0.3 · PostgreSQL 18 · Jest 30 + ts-jest.
 
 ## 🚀 Como executar
 
-Resumo rápido (pressupõe Node.js LTS e Docker Desktop já instalados e rodando):
+Resumo rápido (pressupõe Node.js LTS e Docker Desktop já instalados e **abertos**):
 
 ```bash
-git clone https://github.com/SEU_USUARIO/cinebridge.git
+git clone https://github.com/Costa-Wagner/cinebridge.git
 cd cinebridge
 npm install
 cp .env.example .env
@@ -89,83 +93,149 @@ npm run seed
 npm run dev
 ```
 
+> **Atualizando de uma versão anterior?** A imagem do banco passou de PostgreSQL 16 para 18 (o enunciado pede a versão mais recente). Os dados de um volume antigo não são reaproveitados: rode `docker compose down -v` antes do `up -d` e refaça o `npm run seed`.
+
 **Guia completo, passo a passo — com instalação de pré-requisitos, instruções específicas para Ubuntu/WSL2 e solução de problemas comuns**: [docs/execucao.md](docs/execucao.md).
 
 ## 🗂 Estrutura do projeto
 
 ```
 src/
-├── aplicacao/       # ServicoProjetos + CatalogoProfissionais
+├── aplicacao/       # ServicoProjetos (casos de uso) + CatalogoProfissionais (cadastro em memória)
 ├── config/          # DataSource TypeORM, perfil de competências por papel
 ├── domain/
-│   ├── entities/    # Projeto, Profissional, Equipe, Convite, Avaliacao...
+│   ├── entities/    # Projeto (+ 3 subclasses), Profissional, Equipe, MembroEquipe, Convite, Recomendacao...
 │   ├── enums/       # Papel, StatusConvite, StatusEquipe, TipoCaptacao
-│   ├── prototipos/  # Prototype de projetos
+│   ├── prototipos/  # RegistroPrototipos
 │   └── erros.ts
-├── fabricas/        # Abstract Factory (documentário, animação, publicitário)
-├── strategies/      # Strategy de pontuação/recomendação
+├── fabricas/        # FabricaProjeto + famílias documentario/, animacao/, publicitario/
+├── strategies/      # PontuacaoStrategy (algoritmos) + RecomendacaoStrategy (contrato do diagrama)
 ├── orquestrador/    # Template Method (OrquestradorEquipe / OrquestradorPadrao)
-├── observers/       # Observer (SistemaRecomendacao e assinantes)
-├── visitors/        # Visitor (validação, compatibilidade, relatório)
-├── eventos/         # Barramento de eventos externos
-├── integracao/      # Testes de integração
+├── observers/       # Observer: SistemaRecomendacao (sujeito) e observadores
+├── visitors/        # Visitor: validação, compatibilidade, relatório
+├── eventos/         # Barramento de eventos entre microsserviços (EventEmitter)
+├── integracao/      # Testes de integração (Postgres) e teste de carga
 ├── app.ts           # Rotas Fastify
+├── composicao.ts    # Raiz de composição: fábricas + observadores
 ├── server.ts        # Entrypoint HTTP
-├── composicao.ts    # Wiring (fábricas + observers)
 └── seed.ts          # Dados de exemplo
 ```
 
-Os arquivos de teste automatizado (`*.test.ts`) ficam ao lado do arquivo que testam (ex: `SimilaridadeCosseno.ts` + `SimilaridadeCosseno.test.ts`).
+Os testes unitários (`*.test.ts`) ficam ao lado do arquivo que testam; os de integração são `*.integration.test.ts`, em `src/integracao/`.
 
-## 🏗 Decisão de arquitetura — padrões de projeto aplicados
+## 🏗 Padrões de projeto aplicados
 
 ```mermaid
 flowchart TD
-    A["POST /projetos/:id/recomendar"] --> B["OrquestradorPadrao.orquestrar()<br/>(Template Method)"]
-    B --> C{"Para cada papel obrigatório do projeto"}
-    C --> D["Strategy.recomendar()<br/>(pontua e ranqueia candidatos)"]
-    D --> E["Publicador.notificarAssinantes()<br/>(Observer)"]
-    E --> E1["ServicoEmail"]
-    E --> E2["ServicoMensagensInternas"]
-    E --> E3["ModuloAuditoria"]
-    D --> F["selecionarCandidato() + criarConvite()"]
-    F --> C
-    C -->|todos os papéis processados| G["Retorna recomendações + convites"]
+    A["POST /projetos {tipoCaptacao, ...}"] --> B["SistemaRecomendacao.criarProjeto()"]
+    B --> C["Fábrica do tipo<br/>(Abstract Factory)"]
+    C --> D["Prototype: clona o modelo do tipo<br/>e aplica os dados recebidos"]
+    D --> E["Validador da fábrica (Visitor)"]
 
-    H["Profissional / Projeto"] -.->|"aceitar(visitante)"| I["Visitor<br/>(operação transversal, fora do fluxo HTTP)"]
-    I --> I1["ValidadorConsistencia"]
-    I --> I2["CalculadorCompatibilidade"]
-    I --> I3["GeradorRelatorio"]
+    F["POST /projetos/:id/recomendar"] --> G["CatalogoProfissionais.preSelecionar()"]
+    G --> H["SistemaRecomendacao.recomendar()<br/>escolhe a fábrica pelo tipo do projeto"]
+    H --> I["OrquestradorPadrao.orquestrar()<br/>(Template Method)"]
+    I --> I1["1 validarRestricoes"]
+    I1 --> I2["2 normalizarDados"]
+    I2 --> I3["3 Strategy.recomendar() — recomendador da fábrica"]
+    I3 --> I4["4 posProcessar"]
+    I4 --> I5["5 notifica: notificador da fábrica + Observers"]
+    I5 --> I6["6 monta a Equipe"]
 ```
 
-**Strategy** — `IRecomendacaoStrategy`, três implementações intercambiáveis (0–10 pontos):
-
-| Estratégia | Arquivo | Critério |
+| Padrão | Onde | Papel no projeto |
 |---|---|---|
-| `SIMILARIDADE_COSSENO` | `strategies/SimilaridadeCosseno.ts` | Similaridade de cosseno entre competências do profissional e o perfil ideal do papel |
-| `FILTRAGEM_COLABORATIVA` | `strategies/FiltragemColaborativa.ts` | Média histórica de avaliações + bônus de afinidade por gênero de projeto |
-| `REGRAS_ORCAMENTO` | `strategies/RegrasOrcamento.ts` | Viabilidade financeira e disponibilidade na janela de entrega |
+| **Strategy** | `strategies/` | `PontuacaoStrategy` (Similaridade de cosseno, Filtragem colaborativa, Regras de orçamento, Híbrida, Animação) e `RecomendacaoStrategy` (contrato do diagrama: `Map<Papel, Profissional[]>`), ligadas por `RecomendadorPorPontuacao` |
+| **Template Method** | `orquestrador/` | `OrquestradorEquipe.orquestrar()` fixa a ordem do fluxo e **não pode ser sobrescrito** (o construtor recusa); `OrquestradorPadrao` implementa `validarRestricoes`, `normalizarDados` e `posProcessar` |
+| **Observer** | `observers/` | `SistemaRecomendacao` notifica seis tipos de evento (recomendação, convite enviado/aceito/recusado, substituição, equipe formada) a `ServicoEmail`, `ServicoMensagensInternas`, `ModuloAuditoria` (log JSON) e `IntegradorMicrosservicos`. Um observador com falha não impede os demais |
+| **Visitor** | `visitors/` | `ValidadorConsistencia` e os validadores por tipo (criados pela fábrica) rodam em toda criação e orquestração via `projeto.aceitar(validador)`; `CalculadorCompatibilidade` e `GeradorRelatorio` operam sobre as mesmas entidades sem alterá-las |
+| **Prototype** | `domain/entities/Projeto*.ts`, `domain/prototipos/` | `Projeto.clonar()` (cópia profunda, sem id nem relações) e `RegistroPrototipos`; cada fábrica guarda o modelo do seu tipo |
+| **Abstract Factory** | `fabricas/` | `FabricaProjeto` cria a família completa de cada tipo; o orquestrador e o `SistemaRecomendacao` não conhecem nenhum tipo concreto (um teste automatizado verifica isso) |
 
-**Template Method** — `OrquestradorEquipe` (abstrata) fixa o algoritmo em `orquestrar()`; `OrquestradorPadrao` (concreta) só implementa os dois pontos variáveis: qual strategy usar e o critério de corte (`pontuacaoMinima`).
+**Famílias por tipo** (premissas de domínio):
 
-**Observer** — `Publicador`/`Assinante`. A cada recomendação gerada, `SistemaRecomendacao` notifica `ServicoEmail`, `ServicoMensagensInternas` e `ModuloAuditoria`, sem conhecer os detalhes de cada um.
+| Tipo | Papéis padrão | Validador exige | Recomendador | Notificador |
+|---|---|---|---|---|
+| Documentário | Diretor, Roteirista, Dir. Fotografia, Editor, Sonoplasta | `tema` e ao menos 1 entrevistado | 60% cosseno + 40% filtragem colaborativa | tema e entrevistados |
+| Animação | Diretor, Efeitos Visuais, Roteirista, Editor, Sonoplasta | `softwareModelagem` e o papel de Efeitos Visuais | Cosseno + bônus de até 2 pontos por domínio do software | métricas de renderização |
+| Publicitário | Diretor, Dir. Fotografia, Editor | `cliente` e `canal` | 50% cosseno + 50% regras de orçamento | cliente e canal |
 
-**Visitor** — `IVisitanteProjeto`, implementada por `Projeto`/`Profissional` via `ElementoVisitavel.aceitar()`. `ValidadorConsistencia`, `CalculadorCompatibilidade` e `GeradorRelatorio` adicionam operações novas sem alterar as entidades. Roda hoje de forma independente do fluxo HTTP (script de demonstração), não integrado na rota `/recomendar`.
+**Novo tipo sem alterar o orquestrador:** basta criar uma fábrica e registrá-la em `composicao.ts` (`sistema.registrarFabrica(tipo, fabrica)`). `src/fabricas/Extensibilidade.test.ts` demonstra com uma `FabricaRealidadeVirtual` definida só no teste.
+
+## 📐 Mapeamento UML → código e premissas
+
+| Diagrama da ATV2 | Código |
+|---|---|
+| `Projeto` (`clonar`, `aceitarRecomendacao`, `substituirMembro`, `solicitarReavaliacao`) | `domain/entities/Projeto.ts` |
+| `ProjetoDocumentario` / `ProjetoAnimacao` / `ProjetoPublicitario` | `domain/entities/Projeto*.ts` (tabela única `projetos`, discriminador `tipoCaptacao`) |
+| `FabricaProjeto` + `FabricaDocumentario` / `FabricaAnimacao` / `FabricaPublicitario` | `fabricas/` |
+| `RecomendacaoStrategy`, `Recomendador*` | `strategies/RecomendacaoStrategy.ts`, `fabricas/*/Recomendador*.ts` |
+| `VisitanteProjeto`, `Validador*` | `visitors/VisitanteProjeto.ts`, `fabricas/*/Validador*.ts` |
+| `Observador`, `EventoRecomendacao`, `Notificador*` | `observers/Observador.ts`, `observers/EventoRecomendacao.ts`, `fabricas/*/Notificador*.ts` |
+| `OrquestradorEquipe`, `OrquestradorPadrao` | `orquestrador/` |
+| `Equipe`, `MembroEquipe` | `domain/entities/` |
+
+O diagrama entregue está **cortado na borda direita**; o que não aparece nele foi assumido e fica registrado aqui:
+
+- Campos de `ProjetoAnimacao` (`softwareModelagem`, `metricasRenderizacao`) e de `ProjetoPublicitario` (`cliente`, `canal`) são premissas; `ProjetoDocumentario` (`tema`, `entrevistados`) vem do diagrama.
+- `orquestrar(projeto, profissionais, estrategia?, papeis?)` difere da assinatura do diagrama: os profissionais disponíveis são entregues pelo chamador, a estratégia é opcional (por padrão vem da fábrica) e `papeis` restringe a rodada a alguns papéis (usado ao substituir um membro).
+- `substituirMembro(papel, profissional)`: `profissional` é quem o produtor **dispensa**.
+- `FabricaProjeto.criarValidador()` devolve `ValidadorConsistencia` (um `VisitanteProjeto` que acumula `problemas`), subtipo compatível com o diagrama.
+- A pontuação não faz parte do contrato `RecomendacaoStrategy`; por isso `Recomendacao.pontuacao` é nula no histórico (posição e recomendador são gravados).
+
+## 👥 Fluxo da equipe
+
+```
+recomendar ──► equipe EM_FORMACAO, membros PROPOSTOS
+                   │ produtor: aceitar            │ produtor: substituir (só aquele papel)
+                   ▼                              ▼
+             convite PENDENTE              dispensado sai; nova rodada para o papel
+                   │ profissional responde
+         ┌─────────┴─────────┐
+         ▼                   ▼
+   CONFIRMADO            RECUSADO ──► produtor decide (substituir)
+         │ todos os papéis confirmados
+         ▼
+   equipe FORMADA ──► evento "equipe.formada" ──► gerenciamento de projetos e financeiro
+```
+
+- `reavaliar` mantém quem já confirmou, cancela convites pendentes e refaz o restante (aceita `orcamentoTotal` e `dataEntrega` novos).
+- Quem foi dispensado num papel não volta a ser sugerido para ele.
+- `POST /projetos/:id/recomendar` só vale enquanto não há convites; depois use `reavaliar`.
 
 ## 🖥 Endpoints
 
 | Método | Rota | Descrição | Respostas |
 |---|---|---|---|
-| GET | `/health` | Verificação de que o servidor está no ar | 200 |
-| POST | `/projetos/:id/recomendar` | Aplica a estratégia configurada e retorna a equipe recomendada | 200, 404 |
+| GET | `/health` | Servidor no ar | 200 |
+| POST | `/projetos` | Cria um projeto pela fábrica do `tipoCaptacao` | 201, 400, 422 |
+| POST | `/projetos/:id/recomendar` | Recomenda e grava a equipe proposta (+ alternativas por papel) | 200, 404, 409, 422 |
+| GET | `/projetos/:id/equipe` | Equipe atual com a situação de cada membro | 200, 404 |
+| GET | `/projetos/:id/recomendacoes` | Histórico de rankings por papel (todas as rodadas) | 200, 404 |
+| POST | `/projetos/:id/equipe/aceitar` | Produtor aprova um membro: cria o convite | 201, 404, 409 |
+| POST | `/projetos/:id/equipe/substituir` | Produtor dispensa um membro e refaz só aquele papel | 200, 404, 409 |
+| POST | `/projetos/:id/reavaliar` | Refaz os papéis não confirmados | 200, 404, 409, 422 |
+| POST | `/convites/:id/responder` | Profissional aceita ou recusa (`{"aceito": true}`) | 200, 404, 409 |
+
+Códigos: `400` corpo fora do esquema · `404` não encontrado · `409` operação incompatível com o estado · `422` regras do tipo violadas (a resposta traz a lista `problemas`).
 
 ```bash
-curl -X POST http://localhost:3000/projetos/<uuid-do-projeto>/recomendar
+# 1) criar um documentário
+curl -X POST http://localhost:3000/projetos -H "content-type: application/json" -d '{
+  "tipoCaptacao": "DOCUMENTARIO", "duracaoEstimadaMinutos": 80, "orcamentoTotal": 60000,
+  "dataEntrega": "2026-12-10", "localizacaoFilmagem": "Santos",
+  "tema": "Mares", "entrevistados": ["Ana", "Beto"] }'
+
+# 2) recomendar a equipe (use o id devolvido)
+curl -X POST http://localhost:3000/projetos/<id>/recomendar -H "content-type: application/json" -d '{}'
+
+# 3) convidar um membro proposto e responder ao convite
+curl -X POST http://localhost:3000/projetos/<id>/equipe/aceitar -H "content-type: application/json" \
+  -d '{"papel": "DIRETOR", "profissionalId": "<id-do-profissional>"}'
+curl -X POST http://localhost:3000/convites/<conviteId>/responder -H "content-type: application/json" -d '{"aceito": true}'
 ```
 
-Resposta: JSON com `recomendacoes` (ranking completo por papel) e `convites` (candidato escolhido por papel, status `PENDENTE`).
-
-> Recomenda-se Thunder Client ou Insomnia para visualizar a resposta formatada. Requisições sem corpo devem usar `No Body` (ou `{}`, se a opção não existir) — `Content-Type: application/json` com corpo vazio causa erro `415`.
+> Recomenda-se Thunder Client ou Insomnia para visualizar as respostas. Requisições `POST` sem corpo devem usar `No Body` (ou `{}`) — `Content-Type: application/json` com corpo vazio causa erro `415`.
 
 ## 🔧 Variáveis de ambiente
 
@@ -178,31 +248,37 @@ Resposta: JSON com `recomendacoes` (ranking completo por papel) e `convites` (ca
 | `DB_NAME` | Nome do banco | `cinebridge` |
 | `PORT` | Porta do servidor Fastify | `3000` |
 
-O `docker-compose.yml` lê essas variáveis do `.env` automaticamente.
+Opcionais (testes): `DB_NAME_TEST` (padrão `cinebridge_test`) e `DB_NAME_CARGA` (padrão `cinebridge_carga`). Os testes de integração e de carga criam esses bancos sozinhos e **nunca tocam no banco de desenvolvimento**. O `docker-compose.yml` lê as variáveis do `.env`.
 
 ## 🧪 Testes
 
 ```bash
-npm test              # roda toda a suíte
-npm run test:coverage # roda com relatório de cobertura
+npm test                  # unitários (não precisam de Docker)
+npm run test:coverage     # unitários + cobertura (mínimo de 80% configurado)
+npm run test:integration  # integração com Postgres real (exige: docker compose up -d)
+npm run carga             # teste de carga do requisito de desempenho (exige o Postgres)
 ```
 
-| Padrão | Suítes cobertas |
-|---|---|
-| Strategy | `SimilaridadeCosseno`, `FiltragemColaborativa`, `RegrasOrcamento` |
-| Template Method | `OrquestradorPadrao` |
-| Observer | `SistemaRecomendacao`, `ServicoEmail`, `ServicoMensagensInternas`, `ModuloAuditoria` |
-| Visitor | `ValidadorConsistencia`, `CalculadorCompatibilidade`, `GeradorRelatorio` |
+| Nível | Quantidade | O que cobre |
+|---|---|---|
+| Unitários | **220 testes, 25 suítes** — 100% das linhas e dos *statements*, ~95% dos ramos | Strategies, Template Method (incl. invariância do fluxo), Observer (incl. isolamento de falhas), Visitor, Prototype, fábricas, domínio do fluxo de convite, serviço, API e catálogo |
+| Integração | **25 testes, 2 suítes** | API → serviço → Postgres: criação por tipo, equipes consistentes com o tipo, notificações por tipo, persistência e substituição da equipe, troca de strategy alterando o resultado, Visitor sobre as mesmas entidades, fluxo completo de convites até a equipe formada (com evento externo), histórico de recomendações |
+| Carga | 1 script | 10 mil profissionais, 100 requisições simultâneas (ver [Desempenho](#-desempenho)) |
 
-Estado atual: **197 testes, 24 suítes, ~89% stmts/lines, ~84% branches, ~96% funcs**
-(threshold mínimo: 80%). A carga de profissionais usa `CatalogoProfissionais`
-(queries O(n) + cache com TTL).
+Os testes unitários usam fakes e rodam com o Docker parado. Entidades (`domain/entities/`), `config/`, `server.ts`, `composicao.ts` e `integracao/` ficam fora do cálculo de cobertura (`jest.config.js`) por serem decorators do TypeORM, *setup* e infraestrutura de teste; a lógica que usa as entidades é coberta pelos testes de domínio e de integração.
 
-Todos os testes são **unitários**: usam objetos fake/mock e chamam as classes diretamente, sem depender do Postgres — por isso rodam mesmo com o Docker parado. Não há testes de integração validando inserção real no banco (essa cobertura hoje é só manual, via `seed.ts` + verificação da rota).
+O roteiro manual da rota HTTP e a evidência bruta de cobertura em Windows e Ubuntu estão em [docs/testes.md](docs/testes.md).
 
-O roteiro completo dos testes manuais da rota HTTP (requisições, resultado esperado e obtido) e a evidência bruta de cobertura em Windows e Ubuntu está em [docs/testes.md](docs/testes.md).
+## ⚡ Desempenho
 
-Entidades de domínio (`domain/entities/`) e arquivos de infraestrutura (`config/`, `server.ts`) são excluídos do cálculo de cobertura (`jest.config.js`) por serem majoritariamente decorators do TypeORM e setup, sem lógica de negócio própria.
+Requisito: recomendações em até **2 s** com até **10 mil profissionais** ativos e **100 requisições simultâneas**.
+
+Duas decisões sustentam o requisito:
+
+1. **`CatalogoProfissionais`**: o `find({ relations })` do TypeORM gera produto cartesiano e estoura a memória do Node com 10 mil registros (medido: 99 requisições simultâneas derrubavam o processo). O catálogo lê o cadastro com 4 consultas simples, monta as entidades em O(n), o compartilha entre as requisições (uma única leitura, mesmo com requisições simultâneas), o renova a cada 60 s e o invalida quando os convites mudam. O servidor o carrega na subida.
+2. **Pré-seleção por aderência**: a cada carga do cadastro, monta-se por papel um ranking de aderência (cosseno com o perfil do papel). A recomendação recebe só os 30 mais aderentes de cada papel e cada tipo de projeto os reordena com os seus critérios (reputação, orçamento, software). É a estratégia usual de *geração de candidatos + ranqueamento*: o custo por requisição não cresce com o cadastro. O trade-off é que um profissional fora dos 30 mais aderentes de um papel nunca é considerado para ele (`LIMITE_PRESELECAO`).
+
+Medição local (`npm run carga`, 10 mil profissionais, 100 requisições simultâneas, API em memória): **p95 ≈ 0,8–1,0 s** com o cadastro em memória (limite: 2 s), cerca de 8–10 ms de processamento por requisição. A rodada com cadastro "frio" (a primeira requisição lê o cadastro) é só informativa e fica em torno de 2 a 2,5 s; por isso o servidor carrega o cadastro na subida. O Node processa uma requisição por vez, então o tempo total é proporcional à velocidade do processador da máquina: o script imprime no fim um diagnóstico (ida e volta ao banco, uma requisição isolada e o custo médio por requisição) para interpretar o resultado em outro computador. Parâmetros: `PROFISSIONAIS`, `REQUISICOES`, `LIMITE_MS`; `DB_POOL` ajusta as conexões simultâneas com o banco (padrão 20).
 
 ## 🔩 Scripts de demonstração manual
 
@@ -211,25 +287,36 @@ npm run test:orquestrador  # Strategy + Template Method + Observer, ponta a pont
 npm run test:visitors      # Visitor, percorrendo projeto + profissionais seedados
 ```
 
-Diferente dos `*.test.ts` (Jest, mocks, sem banco), esses dois scripts fazem execução real contra o Postgres — exigem `docker compose up -d` e `npm run seed` antes.
+Diferente dos testes Jest, esses scripts executam contra o Postgres de desenvolvimento — exigem `docker compose up -d` e `npm run seed`.
 
 ## 🖥 Compatibilidade
 
 | Sistema | Situação |
 |---|---|
-| Windows 10+ (desenvolvimento) | Testado ponta a ponta |
-| Ubuntu 24.04+ | Testado ponta a ponta via WSL2 — instalação, suíte de testes (197/197) e rota HTTP confirmados |
+| Windows 10+ | Desenvolvimento e testes (unitários e de integração) |
+| Ubuntu 24.04 | ATV1 validada ponta a ponta via WSL2; na ATV2, suítes unitária e de integração e o teste de carga executados em Ubuntu 24.04 nativo (com Postgres local) |
 
 ## 💾 Persistência de dados
 
-PostgreSQL 16 via Docker Compose, com volume nomeado (`cinebridge_pgdata`) — os dados persistem entre reinicializações do container. `npm run seed` popula projetos e profissionais de exemplo.
+PostgreSQL 18 via Docker Compose (`postgres:18-alpine`), com volume nomeado `cinebridge_pgdata` montado em `/var/lib/postgresql` (layout exigido pela imagem 18). O schema é criado pelo TypeORM (`synchronize`). `npm run seed` popula profissionais e um projeto de animação de exemplo.
+
+Tabelas principais: `projetos` (tabela única para os três tipos), `profissionais`, `competencias`, `profissional_competencias`, `avaliacoes`, `equipes`, `membros_equipe`, `convites` e `recomendacoes` (histórico).
+
+## ⚠️ Limitações conhecidas
+
+- `Recomendacao.pontuacao` fica nula: o contrato do diagrama devolve só a ordem dos candidatos.
+- O schema usa `synchronize` (adequado para este exercício); em produção seriam migrations.
+- A comunicação entre serviços é em memória (`EventEmitter`); o barramento tem interface própria para trocar por RabbitMQ sem mudar quem publica. Gerenciamento de projetos e financeiro são consumidores simulados.
+- A pré-seleção por aderência é aproximada (ver [Desempenho](#-desempenho)).
+- A auditoria é um log JSON por evento; não há tabela de auditoria.
+- `CalculadorCompatibilidade` e `GeradorRelatorio` (Visitor) não têm rota HTTP; são exercitados por testes e pelo script `test:visitors`.
 
 ## 🎯 Conceitos aplicados
 
-- Node.js + TypeScript em modo estrito
-- Fastify e API REST (verbos HTTP e códigos de status)
-- TypeORM: `@Entity`, `@OneToMany`, colunas `jsonb`/`simple-array`
-- Padrões de projeto: Strategy, Template Method, Observer, Visitor
-- Testes unitários com Jest + ts-jest, mocks e fakes, cobertura de código
-- Injeção de dependência explícita via construtor (strategy e publicador injetados no orquestrador)
-- `CatalogoProfissionais`: carga O(n) de profissionais, cache com TTL e invalidação no fluxo de convites
+- Node.js + TypeScript em modo estrito; Fastify e API REST (verbos, códigos de status e validação de esquema)
+- TypeORM: herança de tabela única (`@TableInheritance`/`@ChildEntity`), `jsonb`, relações e transações
+- Padrões de projeto: Strategy, Template Method, Observer, Visitor, Prototype, Abstract Factory
+- Injeção de dependência explícita por construtor e raiz de composição (`composicao.ts`)
+- Testes unitários, de integração e de carga com Jest; cobertura de código
+- Comunicação entre serviços por eventos (`EventEmitter`)
+- Desempenho: carga O(n), cache compartilhado e geração de candidatos

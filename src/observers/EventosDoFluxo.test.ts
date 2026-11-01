@@ -71,8 +71,13 @@ describe("observers reagem a cada tipo de evento do fluxo", () => {
       new ModuloAuditoria().atualizar(evento(TipoEvento.EQUIPE_FORMADA, { papel: null, candidatos: [ana, bruno] } as never));
     });
 
-    expect(linhas[0]).toContain("equipe_formada");
-    expect(linhas[0]).toContain("projeto=proj-1 papel=- qtd=2");
+    expect(JSON.parse(linhas[0])).toMatchObject({
+      origem: "AUDITORIA",
+      evento: "EQUIPE_FORMADA",
+      projetoId: "proj-1",
+      papel: null,
+      quantidade: 2
+    });
   });
 });
 

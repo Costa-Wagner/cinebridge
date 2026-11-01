@@ -44,7 +44,8 @@ function montar() {
     aceitarRecomendacao: jest.fn(),
     substituirMembro: jest.fn(),
     reavaliar: jest.fn(),
-    responderConvite: jest.fn()
+    responderConvite: jest.fn(),
+    listarRecomendacoes: jest.fn()
   };
   const app = criarApp(servico as unknown as ServicoProjetos);
   return { app, servico };
@@ -288,6 +289,36 @@ describe("API", () => {
 
       expect(resposta.json().membros.map((m: { situacao: string }) => m.situacao)).toEqual(["CONFIRMADO", "PENDENTE"]);
       expect(resposta.json().membros[1].conviteId).toBe("c9");
+    });
+  });
+
+  describe("GET /projetos/:id/recomendacoes", () => {
+    it("lista o historico com papel, posicao, profissional e recomendador", async () => {
+      const { app, servico } = montar();
+      servico.listarRecomendacoes.mockResolvedValue([
+        { papel: "DIRETOR", posicaoRanking: 1, profissional: ana, estrategiaUtilizada: "RecomendadorDocumentario", pontuacao: null, criadoEm: "2026-10-18T12:00:00.000Z" }
+      ]);
+
+      const resposta = await app.inject({ method: "GET", url: `/projetos/${ID}/recomendacoes` });
+
+      expect(resposta.statusCode).toBe(200);
+      expect(resposta.json()).toEqual([
+        {
+          papel: "DIRETOR",
+          posicao: 1,
+          profissional: { id: "p1", nome: "Ana" },
+          estrategia: "RecomendadorDocumentario",
+          pontuacao: null,
+          geradaEm: "2026-10-18T12:00:00.000Z"
+        }
+      ]);
+    });
+
+    it("responde 404 para projeto inexistente", async () => {
+      const { app, servico } = montar();
+      servico.listarRecomendacoes.mockResolvedValue(null);
+
+      expect((await app.inject({ method: "GET", url: `/projetos/${ID}/recomendacoes` })).statusCode).toBe(404);
     });
   });
 });

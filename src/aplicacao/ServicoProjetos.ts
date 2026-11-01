@@ -1,4 +1,4 @@
-import { DataSource } from "typeorm";
+import { DataSource, EntityManager } from "typeorm";
 import { SistemaRecomendacao } from "../observers/SistemaRecomendacao";
 import { TipoEvento } from "../observers/TipoEvento";
 import { DadosProjeto } from "../fabricas/FabricaProjeto";
@@ -12,6 +12,7 @@ import { Profissional } from "../domain/entities/Profissional";
 import { Equipe } from "../domain/entities/Equipe";
 import { MembroEquipe } from "../domain/entities/MembroEquipe";
 import { Convite } from "../domain/entities/Convite";
+import { Recomendacao } from "../domain/entities/Recomendacao";
 import { CatalogoProfissionais } from "./CatalogoProfissionais";
 
 const RELACOES_EQUIPE = ["equipe", "equipe.membros", "equipe.membros.profissional", "equipe.membros.convite"];
@@ -48,20 +49,46 @@ export class ServicoProjetos {
    * ela e' substituida; com convites em andamento use `reavaliar`.
    */
   async recomendar(projetoId: string): Promise<Equipe | null> {
-    const projeto = await this.carregarProjeto(projetoId);
+    // caminho quente: sem carregar a arvore equipe/membros/convites (so' interessa se ha convites)
+    const projeto = await this.dataSource.getRepository(Projeto).findOneBy({ id: projetoId });
     if (!projeto) return null;
-    if (projeto.equipe?.membros.some((m) => m.convite)) {
+    if (await this.temConvitesEmAndamento(projetoId)) {
       throw new OperacaoInvalidaError("Equipe ja tem convites em andamento; use a reavaliacao");
     }
 
     const papeis = projeto.papeisObrigatorios.map((p) => p.papel as Papel);
     const profissionais = await this.catalogo.preSelecionar(papeis);
     const equipe = this.sistema.recomendar(projeto, profissionais);
+
+    // gravacao em lote (INSERTs diretos): e' uma equipe nova, sem nada a comparar com o banco
     await this.dataSource.transaction(async (manager) => {
       await manager.createQueryBuilder().delete().from(Equipe).where("projeto_id = :id", { id: projeto.id }).execute();
-      await manager.save(equipe);
+      await manager.insert(Equipe, equipe as never);
+      for (const membro of equipe.membros) membro.equipe = equipe;
+      if (equipe.membros.length > 0) await manager.insert(MembroEquipe, equipe.membros as never);
+      await this.registrarRecomendacoes(manager, projeto, [equipe]);
     });
     return equipe;
+  }
+
+  private async temConvitesEmAndamento(projetoId: string): Promise<boolean> {
+    const linhas = await this.dataSource.query(
+      `SELECT 1 FROM membros_equipe m JOIN equipes e ON e.id = m.equipe_id
+        WHERE e.projeto_id = $1 AND m.convite_id IS NOT NULL LIMIT 1`,
+      [projetoId]
+    );
+    return linhas.length > 0;
+  }
+
+  /** Historico de recomendacoes do projeto (todas as rodadas), da mais recente para a mais antiga. Null se o projeto nao existe. */
+  async listarRecomendacoes(projetoId: string): Promise<Recomendacao[] | null> {
+    const projeto = await this.dataSource.getRepository(Projeto).findOne({ where: { id: projetoId } });
+    if (!projeto) return null;
+    return this.dataSource.getRepository(Recomendacao).find({
+      where: { projeto: { id: projetoId } },
+      relations: ["profissional"],
+      order: { criadoEm: "DESC", papel: "ASC", posicaoRanking: "ASC" }
+    });
   }
 
   async buscarEquipe(projetoId: string): Promise<Equipe | null> {
@@ -149,9 +176,10 @@ export class ServicoProjetos {
       papel,
       candidatos: [profissional]
     });
-    projeto.equipe!.membros.push(...(await this.proporMembros(projeto, [papel])));
+    const proposta = await this.proporMembros(projeto, [papel]);
+    projeto.equipe!.membros.push(...proposta.membros);
 
-    await this.salvar(projeto, convitesAfetados);
+    await this.salvar(projeto, convitesAfetados, proposta.rodadas);
     this.catalogo.invalidar();
     return this.apresentar(projeto);
   }
@@ -169,9 +197,10 @@ export class ServicoProjetos {
     const convitesAfetados = this.convitesDaEquipe(projeto);
 
     const papeis = projeto.solicitarReavaliacao();
-    projeto.equipe!.membros.push(...(await this.proporMembros(projeto, papeis)));
+    const proposta = await this.proporMembros(projeto, papeis);
+    projeto.equipe!.membros.push(...proposta.membros);
 
-    await this.salvar(projeto, convitesAfetados);
+    await this.salvar(projeto, convitesAfetados, proposta.rodadas);
     this.catalogo.invalidar();
     return this.apresentar(projeto);
   }
@@ -203,29 +232,56 @@ export class ServicoProjetos {
   }
 
   /** Sugere membro para cada papel, sem repetir quem ja esta na equipe nem quem o produtor dispensou naquele papel. */
-  private async proporMembros(projeto: Projeto, papeis: Papel[]): Promise<MembroEquipe[]> {
+  private async proporMembros(
+    projeto: Projeto,
+    papeis: Papel[]
+  ): Promise<{ membros: MembroEquipe[]; rodadas: Equipe[] }> {
     const ocupados = new Set(projeto.equipe!.membros.map((m) => m.profissional.id));
     const novos: MembroEquipe[] = [];
+    const rodadas: Equipe[] = [];
     for (const papel of papeis) {
       const todos = await this.catalogo.preSelecionar([papel]);
       const dispensados = new Set((projeto.rejeitados ?? []).filter((r) => r.papel === papel).map((r) => r.profissionalId));
       const candidatos = todos.filter((p) => !ocupados.has(p.id) && !dispensados.has(p.id));
-      for (const membro of this.sistema.recomendar(projeto, candidatos, undefined, [papel]).membros) {
+      const rodada = this.sistema.recomendar(projeto, candidatos, undefined, [papel]);
+      rodadas.push(rodada);
+      for (const membro of rodada.membros) {
         ocupados.add(membro.profissional.id);
         novos.push(membro);
       }
     }
-    return novos;
+    return { membros: novos, rodadas };
   }
 
-  private async salvar(projeto: Projeto, convitesAfetados: Convite[] = []): Promise<void> {
+  private async salvar(projeto: Projeto, convitesAfetados: Convite[] = [], rodadas: Equipe[] = []): Promise<void> {
     const equipe = projeto.equipe!;
     equipe.projeto = projeto;
     await this.dataSource.transaction(async (manager) => {
       await manager.save(projeto);
       if (convitesAfetados.length > 0) await manager.save(convitesAfetados);
       await manager.save(equipe);
+      await this.registrarRecomendacoes(manager, projeto, rodadas);
     });
+  }
+
+  /** Grava o ranking de cada rodada (papel, posicao, recomendador) como historico do projeto. */
+  private async registrarRecomendacoes(manager: EntityManager, projeto: Projeto, rodadas: Equipe[]): Promise<void> {
+    const registros = rodadas.flatMap((rodada) =>
+      [...(rodada.ranking ?? [])].flatMap(([papel, candidatos]) =>
+        candidatos.map((profissional, indice) =>
+          Object.assign(new Recomendacao(), {
+            projeto,
+            profissional,
+            papel,
+            pontuacao: null,
+            posicaoRanking: indice + 1,
+            estrategiaUtilizada: rodada.estrategia
+          })
+        )
+      )
+    );
+    // um unico INSERT em lote: o historico e' so' gravacao e nao precisa do ciclo completo do ORM
+    if (registros.length > 0) await manager.insert(Recomendacao, registros);
   }
 
   /** Membros na ordem dos papeis do projeto (o banco nao garante ordem). */

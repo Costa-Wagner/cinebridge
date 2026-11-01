@@ -127,6 +127,21 @@ export function criarApp(servico: ServicoProjetos, opcoes: { logger?: boolean } 
     return reply.send(resumoEquipe(equipe));
   });
 
+  app.get<{ Params: { id: string } }>("/projetos/:id/recomendacoes", { schema: schemaId }, async (request, reply) => {
+    const registros = await servico.listarRecomendacoes(request.params.id);
+    if (!registros) return reply.status(404).send({ erro: "Projeto não encontrado" });
+    return reply.send(
+      registros.map((r) => ({
+        papel: r.papel,
+        posicao: r.posicaoRanking,
+        profissional: resumo(r.profissional),
+        estrategia: r.estrategiaUtilizada,
+        pontuacao: r.pontuacao,
+        geradaEm: r.criadoEm
+      }))
+    );
+  });
+
   // ---- fluxo do produtor e dos profissionais sobre a equipe ----
 
   app.post<{ Params: { id: string }; Body: { papel: Papel; profissionalId: string } }>(

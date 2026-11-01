@@ -185,6 +185,6 @@ describe("CatalogoProfissionais.preSelecionar (geracao de candidatos por aderenc
   });
 
   it("o limite padrao por papel e' o configurado", () => {
-    expect(LIMITE_PRESELECAO).toBe(100);
+    expect(LIMITE_PRESELECAO).toBe(30);
   });
 });

@@ -11,7 +11,7 @@ import { SimilaridadeCosseno } from "../strategies/SimilaridadeCosseno";
 import { ehCandidatoElegivel } from "../strategies/RecomendadorPorPontuacao";
 
 /** Quantos profissionais, por papel, seguem para a etapa de ranqueamento. */
-export const LIMITE_PRESELECAO = 100;
+export const LIMITE_PRESELECAO = 30;
 
 interface Carga {
   carregadoEm: number;

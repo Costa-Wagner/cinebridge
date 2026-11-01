@@ -1,6 +1,6 @@
 services:
   postgres:
-    image: postgres:16-alpine
+    image: postgres:18-alpine
     container_name: cinebridge-postgres
     restart: unless-stopped
     environment:
@@ -10,7 +10,9 @@ services:
     ports:
       - "${DB_PORT}:5432"
     volumes:
-      - cinebridge_pgdata:/var/lib/postgresql/data
+      # A imagem 18+ guarda o cluster em /var/lib/postgresql/18/docker; o volume
+      # deve ser montado no diretorio pai (e nao mais em .../data).
+      - cinebridge_pgdata:/var/lib/postgresql
 
 volumes:
   cinebridge_pgdata:
