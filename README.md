@@ -95,6 +95,8 @@ npm run dev
 
 > **Atualizando de uma versão anterior?** A imagem do banco passou de PostgreSQL 16 para 18 (o enunciado pede a versão mais recente). Os dados de um volume antigo não são reaproveitados: rode `docker compose down -v` antes do `up -d` e refaça o `npm run seed`.
 
+> **Atualizando da ATV3 para a ATV4?** O `docker-compose.yml` agora sobe o RabbitMQ e um Postgres por domínio (`recomendacoes-db` na 5434, `profissionais-db` na 5432, `projetos-db` na 5433, `notificacoes-db` na 5435). Remova o contêiner antigo (`docker rm -f cinebridge-postgres`) e ajuste `DB_PORT=5434` no seu `.env` antes do `up -d`.
+
 **Guia completo, passo a passo — com instalação de pré-requisitos, instruções específicas para Ubuntu/WSL2 e solução de problemas comuns**: [docs/execucao.md](docs/execucao.md).
 
 ## 🗂 Estrutura do projeto
@@ -261,7 +263,7 @@ curl -X POST http://localhost:3000/convites/<conviteId>/responder -H "content-ty
 | Variável | Descrição | Padrão (`.env.example`) |
 |---|---|---|
 | `DB_HOST` | Host do Postgres | `localhost` |
-| `DB_PORT` | Porta do Postgres | `5432` |
+| `DB_PORT` | Porta do Postgres da api (`recomendacoes-db`) | `5434` |
 | `DB_USER` | Usuário do Postgres | `postgres` |
 | `DB_PASSWORD` | Senha do Postgres | `postgres` |
 | `DB_NAME` | Nome do banco | `cinebridge` |

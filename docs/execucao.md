@@ -53,7 +53,7 @@ Confirme que subiu corretamente:
 ```powershell
 docker ps
 ```
-Deve aparecer uma linha com `cinebridge-postgres` e a porta `0.0.0.0:5432->5432/tcp`. Se aparecer uma porta diferente de `5432` (tipo `51234`), o `.env` não foi criado corretamente — repita o passo 4.
+Deve aparecer uma linha com `recomendacoes-db` com a porta `0.0.0.0:5434->5432/tcp` (além de `profissionais-db`, `projetos-db`, `notificacoes-db` e `cinebridge-mq`). Se aparecer uma porta diferente de `5434` (tipo `51234`), o `.env` não foi criado corretamente — repita o passo 4.
 
 ### 6. Popular o banco com dados de exemplo
 
@@ -85,7 +85,7 @@ Deve retornar `{"status":"ok"}`.
 
 Para testar a rota de recomendação, primeiro descubra o UUID do projeto criado pelo seed:
 ```powershell
-docker exec -it cinebridge-postgres psql -U postgres -d cinebridge -c "SELECT id FROM projetos;"
+docker exec -it recomendacoes-db psql -U postgres -d cinebridge -c "SELECT id FROM projetos;"
 ```
 Copie o UUID retornado e use:
 ```powershell
@@ -172,7 +172,7 @@ A partir daqui, os comandos são idênticos aos do Windows (`cp .env.example .en
 | Sintoma | Causa provável | Solução |
 |---|---|---|
 | `docker: command not found` (dentro do Ubuntu/WSL) | Integração WSL do Docker Desktop desativada | Docker Desktop → Settings → Resources → WSL Integration → ativa o toggle da distro |
-| `docker ps` mostra uma porta aleatória em vez de `5432` | Arquivo `.env` não existe ou não foi lido pelo Docker Compose | `cp .env.example .env`, depois `docker compose down && docker compose up -d` |
+| `docker ps` mostra uma porta aleatória em vez de `5434` | Arquivo `.env` não existe ou não foi lido pelo Docker Compose | `cp .env.example .env`, depois `docker compose down && docker compose up -d` |
 | Erro `415 Unsupported Media Type` no Insomnia/Thunder Client | Corpo da requisição em branco com `Content-Type: application/json` presente | Trocar o Body para "No Body", ou digitar `{}` se essa opção não existir |
 | `curl: Failed to connect... Couldn't connect to server` | O `npm run dev` não está rodando, ou está rodando num terminal/sistema diferente do que você está testando (ex: rodou no Git Bash e testou no WSL) | Confirmar que o servidor está ativo no mesmo ambiente (Windows ou WSL) de onde você está testando |
 | `relation "projeto" does not exist` no `psql` | Nome da tabela tem case ou pluralização diferente do esperado | Rodar `\dt` no `psql` pra ver o nome real da tabela (é `projetos`, minúsculo e plural) |
