@@ -5,12 +5,15 @@ import { criarApp } from "./app";
 import { montarSistema } from "./composicao";
 import { ServicoProjetos } from "./aplicacao/ServicoProjetos";
 import { ConfiguracaoDecoradores } from "./decoradores/PilhaDecoradores";
+import { criarBarramento } from "./eventos/criarBarramento";
 
 async function bootstrap(): Promise<void> {
   await AppDataSource.initialize();
+  const barramento = await criarBarramento();
+  console.log(`[BARRAMENTO] ${process.env.BARRAMENTO ?? "memoria"}`);
   const servico = new ServicoProjetos(
     AppDataSource,
-    montarSistema(),
+    montarSistema(barramento),
     undefined,
     new ConfiguracaoDecoradores(process.env.DECORADORES ?? "CACHE")
   );

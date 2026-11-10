@@ -266,6 +266,9 @@ curl -X POST http://localhost:3000/convites/<conviteId>/responder -H "content-ty
 | `DB_PORT` | Porta do Postgres da api (`recomendacoes-db`) | `5434` |
 | `DB_USER` | Usuário do Postgres | `postgres` |
 | `DB_PASSWORD` | Senha do Postgres | `postgres` |
+| `BARRAMENTO` | Barramento de eventos: `memoria` (EventEmitter) ou `rabbitmq` | `memoria` |
+| `MQ_HOST` / `MQ_PORT` | Endereço do RabbitMQ (`cinebridge-mq` dentro da rede do compose) | `localhost` / `5672` |
+| `MQ_USER` / `MQ_PASSWORD` | Credenciais do RabbitMQ | `guest` / `guest` |
 | `DB_NAME` | Nome do banco | `cinebridge` |
 | `PORT` | Porta do servidor Fastify | `3000` |
 | `DECORADORES` | Pilha de decoradores da recomendação, em ordem de aplicação (`CACHE`, `AUDITORIA`, `COMPRESSAO`; vazio = nenhum) | `CACHE` |

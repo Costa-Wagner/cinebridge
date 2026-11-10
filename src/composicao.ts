@@ -15,7 +15,11 @@ import * as os from "os";
 import * as path from "path";
 
 /** Raiz de composicao: registra as fabricas e os observadores da aplicacao. */
-export function montarSistema(barramento: BarramentoEventos = new BarramentoEmMemoria()): SistemaRecomendacao {
+export function montarSistema(
+  barramento: BarramentoEventos = new BarramentoEmMemoria(),
+  // com RabbitMQ os consumidores sao os outros servicos; os simulados so existem em memoria
+  registrarConsumidores: boolean = barramento instanceof BarramentoEmMemoria
+): SistemaRecomendacao {
   const sistema = new SistemaRecomendacao();
   sistema.registrarFabrica(TipoCaptacao.DOCUMENTARIO, new FabricaDocumentario());
   sistema.registrarFabrica(TipoCaptacao.ANIMACAO, new FabricaAnimacao());
@@ -29,6 +33,6 @@ export function montarSistema(barramento: BarramentoEventos = new BarramentoEmMe
   sistema.adicionarObservador(new ServicoMensagensInternas());
   sistema.adicionarObservador(new ModuloAuditoria());
   sistema.adicionarObservador(new IntegradorMicrosservicos(barramento));
-  registrarConsumidoresExternos(barramento);
+  if (registrarConsumidores) registrarConsumidoresExternos(barramento);
   return sistema;
 }
