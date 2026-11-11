@@ -49,6 +49,8 @@ export class ClienteRPC {
       }, timeoutMs);
       this.pendentes.set(id, { resolver: resolve as (valor: unknown) => void, rejeitar: reject, timer });
     });
+    // a resposta pode chegar antes da confirmacao de publicacao: sem isto, uma rejeicao nesse intervalo seria "nao tratada"
+    resposta.catch(() => undefined);
     try {
       await this.canal.publicar(fila, corpo, { correlationId: id, replyTo: this.filaResposta });
     } catch (erro) {

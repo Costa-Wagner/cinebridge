@@ -269,9 +269,16 @@ curl -X POST http://localhost:3000/convites/<conviteId>/responder -H "content-ty
 | `BARRAMENTO` | Barramento de eventos: `memoria` (EventEmitter) ou `rabbitmq` | `memoria` |
 | `MQ_HOST` / `MQ_PORT` | Endereço do RabbitMQ (`cinebridge-mq` dentro da rede do compose) | `localhost` / `5672` |
 | `MQ_USER` / `MQ_PASSWORD` | Credenciais do RabbitMQ | `guest` / `guest` |
+| `PROFISSIONAIS_VIA` | Origem do cadastro: `local` (Postgres da api) ou `mq` (serviço `cinebridge-profissionais` via RabbitMQ, com projeção local) | `local` |
+| `RPC_TIMEOUT_MS` | Tempo máximo de espera por resposta do serviço de profissionais | `5000` |
+| `PROJETOS_DB_HOST` / `PROJETOS_DB_PORT` / `PROJETOS_DB_NAME` | Banco do `cinebridge-projetos` (usuário e senha vêm de `DB_USER`/`DB_PASSWORD`) | `localhost` / `5433` / `projetos` |
 | `DB_NAME` | Nome do banco | `cinebridge` |
 | `PORT` | Porta do servidor Fastify | `3000` |
 | `DECORADORES` | Pilha de decoradores da recomendação, em ordem de aplicação (`CACHE`, `AUDITORIA`, `COMPRESSAO`; vazio = nenhum) | `CACHE` |
+
+Para rodar o cadastro remoto localmente (com `docker compose up -d` ativo): `DB_PORT=5432 DB_NAME=profissionais PORT=3001 npm run servico:profissionais` e, em outro terminal, a api com `BARRAMENTO=rabbitmq PROFISSIONAIS_VIA=mq npm run dev`.
+
+O `cinebridge-projetos` (`npm run servico:projetos`, porta 3002) registra o ciclo de vida dos projetos a partir dos eventos `projeto.criado`, `projeto.atualizado` e `equipe.formada` da api, publica `PROJETO_CRIADO|ATUALIZADO|FINALIZADO` na fila `eventos-projetos` e expõe `GET /projetos` e `GET /projetos/:id` (somente leitura). Para a api publicar esses eventos, use `BARRAMENTO=rabbitmq`.
 
 Opcionais (testes): `DB_NAME_TEST` (padrão `cinebridge_test`) e `DB_NAME_CARGA` (padrão `cinebridge_carga`). Os testes de integração e de carga criam esses bancos sozinhos e **nunca tocam no banco de desenvolvimento**. O `docker-compose.yml` lê as variáveis do `.env`.
 

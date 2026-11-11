@@ -8,6 +8,8 @@
     "start": "node dist/server.js",
     "dev": "ts-node-dev --respawn --transpile-only src/server.ts",
     "seed": "node -r ts-node/register src/seed.ts",
+    "servico:projetos": "node -r ts-node/register src/servicos/projetos/main.ts",
+    "servico:profissionais": "node -r ts-node/register src/servicos/profissionais/main.ts",
     "test:orquestrador": "node -r ts-node/register src/testar-orquestrador.ts",
     "test:visitors": "node -r ts-node/register src/testar-visitors.ts",
     "test": "jest",

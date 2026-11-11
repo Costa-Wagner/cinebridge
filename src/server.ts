@@ -6,16 +6,22 @@ import { montarSistema } from "./composicao";
 import { ServicoProjetos } from "./aplicacao/ServicoProjetos";
 import { ConfiguracaoDecoradores } from "./decoradores/PilhaDecoradores";
 import { criarBarramento } from "./eventos/criarBarramento";
+import { selecionarAdaptadorProfissional } from "./adaptadores/profissional/selecionarAdaptadorProfissional";
 
 async function bootstrap(): Promise<void> {
   await AppDataSource.initialize();
   const barramento = await criarBarramento();
   console.log(`[BARRAMENTO] ${process.env.BARRAMENTO ?? "memoria"}`);
+  const sistema = montarSistema(barramento);
+  const profissional = await selecionarAdaptadorProfissional(AppDataSource);
+  if (profissional) sistema.configurarAdaptadores({ profissional });
+  console.log(`[PROFISSIONAIS] via ${process.env.PROFISSIONAIS_VIA ?? "local"}`);
   const servico = new ServicoProjetos(
     AppDataSource,
-    montarSistema(barramento),
+    sistema,
     undefined,
-    new ConfiguracaoDecoradores(process.env.DECORADORES ?? "CACHE")
+    new ConfiguracaoDecoradores(process.env.DECORADORES ?? "CACHE"),
+    barramento
   );
   await servico.aquecerCadastro(); // a primeira requisicao nao paga a leitura do cadastro
   const app = criarApp(servico, { logger: true });

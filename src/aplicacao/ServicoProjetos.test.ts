@@ -20,6 +20,7 @@ import { ConfiguracaoDecoradores } from "../decoradores/PilhaDecoradores";
 import { CacheDecorator } from "../decoradores/CacheDecorator";
 import { AuditoriaDecorator } from "../decoradores/AuditoriaDecorator";
 import { nomeDaEstrategia } from "../decoradores/RecomendacaoDecorator";
+import { BarramentoEventos } from "../eventos/BarramentoEventos";
 
 /**
  * Testes unitarios do servico com um DataSource de mentira (em memoria):
@@ -82,6 +83,7 @@ function montar(
     convite?: Convite | null;
     recomendacoes?: Recomendacao[];
     convitesEmAndamento?: boolean;
+    eventos?: BarramentoEventos;
   } = {}
 ) {
   const manager = {
@@ -115,7 +117,7 @@ function montar(
   sistema.registrarFabrica(TipoCaptacao.DOCUMENTARIO, new FabricaDocumentario());
   const notificar = jest.spyOn(sistema, "notificarObservadores").mockImplementation(() => {});
   const recomendar = jest.spyOn(sistema, "recomendar");
-  const servico = new ServicoProjetos(dataSource, sistema, catalogo as unknown as CatalogoProfissionais);
+  const servico = new ServicoProjetos(dataSource, sistema, catalogo as unknown as CatalogoProfissionais, undefined, dados.eventos);
   return { servico, manager, sistema, notificar, recomendar, catalogo };
 }
 const tipos = (notificar: jest.SpyInstance) => notificar.mock.calls.map((c) => (c[0] as { tipo: TipoEvento }).tipo);
@@ -435,5 +437,47 @@ describe("ServicoProjetos: pilha de decoradores", () => {
     const { estrategia } = executar.mock.calls[0][1] as { estrategia: unknown };
     expect(estrategia).toBeInstanceOf(AuditoriaDecorator);
     expect(servico.decoradores).toBeInstanceOf(ConfiguracaoDecoradores);
+  });
+});
+
+describe("ServicoProjetos: eventos do ciclo de vida do projeto", () => {
+  const dadosProjeto = { duracaoEstimadaMinutos: 60, orcamentoTotal: 1000, dataEntrega: "2026-12-01", tema: "Rios", entrevistados: ["Ana"] };
+  const barramento = () => ({ publicar: jest.fn().mockResolvedValue(undefined), assinar: jest.fn() });
+
+  it("criar publica projeto.criado com o resumo do projeto gravado", async () => {
+    const eventos = barramento();
+    const { servico, manager } = montar({ eventos });
+    manager.save.mockImplementation(async (projeto: unknown) => Object.assign(projeto as object, { id: "proj-9" }));
+
+    await servico.criar(TipoCaptacao.DOCUMENTARIO, dadosProjeto);
+
+    expect(eventos.publicar).toHaveBeenCalledTimes(1);
+    expect(eventos.publicar).toHaveBeenCalledWith(
+      "projeto.criado",
+      expect.objectContaining({ projetoId: "proj-9", tipoCaptacao: "DOCUMENTARIO", orcamentoTotal: 1000, dataEntrega: "2026-12-01" })
+    );
+  });
+
+  it("reavaliar publica projeto.atualizado com os valores novos", async () => {
+    const eventos = barramento();
+    const projeto = criarProjeto([membro(Papel.DIRETOR, ana, { aceitouConvite: true }), membro(Papel.EDITOR, bruno, { aceitouConvite: true })]);
+    const { servico } = montar({ projeto, profissionais: [ana, bruno], eventos });
+
+    await servico.reavaliar("proj-1", { orcamentoTotal: 9000 });
+
+    expect(eventos.publicar).toHaveBeenCalledWith("projeto.atualizado", expect.objectContaining({ projetoId: "proj-1", orcamentoTotal: 9000 }));
+  });
+
+  it("falha ao publicar e' registrada e nao desfaz a operacao ja gravada", async () => {
+    const erro = jest.spyOn(console, "error").mockImplementation(() => undefined);
+    const eventos = { publicar: jest.fn().mockRejectedValue(new Error("broker fora")), assinar: jest.fn() };
+    const { servico, manager } = montar({ eventos });
+
+    const projeto = await servico.criar(TipoCaptacao.DOCUMENTARIO, dadosProjeto);
+    await new Promise((r) => setImmediate(r));
+
+    expect(manager.save).toHaveBeenCalledWith(projeto);
+    expect(erro).toHaveBeenCalledWith(expect.stringContaining("projeto.criado"), expect.any(Error));
+    erro.mockRestore();
   });
 });

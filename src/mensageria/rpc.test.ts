@@ -80,6 +80,28 @@ describe("RPC sobre filas", () => {
     expect((cliente as unknown as { pendentes: Map<string, unknown> }).pendentes.size).toBe(0);
   });
 
+  it("resposta de erro que chega antes da confirmacao da publicacao nao vira rejeicao nao tratada", async () => {
+    const { canal, cliente } = await montar();
+    await registrarRespondedor(canal, "falha", () => {
+      throw new Error("sem profissionais");
+    });
+    const publicar = canal.publicar.bind(canal);
+    jest.spyOn(canal, "publicar").mockImplementation(async (fila, corpo, meta) => {
+      await publicar(fila, corpo, meta);
+      await new Promise((r) => setTimeout(r, 20)); // a confirmacao do broker demora mais que a resposta
+    });
+    const naoTratadas: unknown[] = [];
+    const ouvinte = (erro: unknown) => naoTratadas.push(erro);
+    process.on("unhandledRejection", ouvinte);
+    try {
+      await expect(cliente.chamar("falha", {})).rejects.toThrow("sem profissionais");
+      await new Promise((r) => setTimeout(r, 20));
+    } finally {
+      process.off("unhandledRejection", ouvinte);
+    }
+    expect(naoTratadas).toEqual([]);
+  });
+
   it("exige iniciar() antes de chamar", async () => {
     const cliente = new ClienteRPC(new CanalEmMemoria());
     await expect(cliente.chamar("f", {})).rejects.toThrow("ClienteRPC nao iniciado");

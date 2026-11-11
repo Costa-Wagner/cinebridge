@@ -17,6 +17,8 @@ import { Recomendacao } from "../domain/entities/Recomendacao";
 import { CatalogoProfissionais } from "./CatalogoProfissionais";
 import { ConfiguracaoDecoradores } from "../decoradores/PilhaDecoradores";
 import { AdaptadorInterno } from "../adaptadores/profissional/AdaptadorInterno";
+import { BarramentoEventos } from "../eventos/BarramentoEventos";
+import { TOPICO_PROJETO_ATUALIZADO, TOPICO_PROJETO_CRIADO, resumirProjeto } from "../eventos/eventosProjeto";
 
 const RELACOES_EQUIPE = ["equipe", "equipe.membros", "equipe.membros.profissional", "equipe.membros.convite"];
 
@@ -33,7 +35,8 @@ export class ServicoProjetos {
     private readonly dataSource: DataSource,
     private readonly sistema: SistemaRecomendacao,
     catalogo?: CatalogoProfissionais,
-    readonly decoradores: ConfiguracaoDecoradores = new ConfiguracaoDecoradores()
+    readonly decoradores: ConfiguracaoDecoradores = new ConfiguracaoDecoradores(),
+    private readonly eventos?: BarramentoEventos
   ) {
     this.catalogo = catalogo ?? new CatalogoProfissionais(dataSource);
     if (!sistema.temAdaptadorProfissional()) {
@@ -48,7 +51,9 @@ export class ServicoProjetos {
 
   async criar(tipo: TipoCaptacao, dados: DadosProjeto): Promise<Projeto> {
     const projeto = this.sistema.criarProjeto(tipo, dados);
-    return this.dataSource.manager.save(projeto);
+    const salvo = await this.dataSource.manager.save(projeto);
+    this.publicarEvento(TOPICO_PROJETO_CRIADO, salvo);
+    return salvo;
   }
 
   /**
@@ -209,10 +214,19 @@ export class ServicoProjetos {
 
     await this.salvar(projeto, convitesAfetados, proposta.rodadas);
     this.catalogo.invalidar();
+    this.publicarEvento(TOPICO_PROJETO_ATUALIZADO, projeto);
     return this.apresentar(projeto);
   }
 
   // ---- apoio ----
+
+  /** Informa o ciclo de vida do projeto ao cinebridge-projetos; falha de publicacao nao desfaz a operacao ja gravada. */
+  private publicarEvento(topico: string, projeto: Projeto): void {
+    if (!this.eventos) return;
+    Promise.resolve(this.eventos.publicar(topico, resumirProjeto(projeto))).catch((erro) =>
+      console.error(`[PROJETOS] falha ao publicar ${topico}:`, erro)
+    );
+  }
 
   private async carregarProjeto(id: string): Promise<Projeto | null> {
     return this.dataSource.getRepository(Projeto).findOne({ where: { id }, relations: RELACOES_EQUIPE });
