@@ -20,6 +20,11 @@ export class BarramentoRabbitMQ implements BarramentoEventos {
     await this.canal.consumir(topico, (mensagem) => tratador(mensagem.corpo));
   }
 
+  /** Falha se a conexao com o broker caiu: declarar uma fila existente e' idempotente (usado pelo /health). */
+  verificar(fila: string): Promise<void> {
+    return this.canal.declararFila(fila);
+  }
+
   private async garantirFila(topico: string): Promise<void> {
     if (this.declaradas.has(topico)) return;
     await this.canal.declararFila(topico);

@@ -30,6 +30,14 @@ describe("BarramentoRabbitMQ", () => {
     expect(declarar).toHaveBeenCalledTimes(1);
   });
 
+  it("verificar usa a conexao e falha quando o canal caiu", async () => {
+    const canal = new CanalEmMemoria();
+    const barramento = new BarramentoRabbitMQ(canal);
+    await expect(barramento.verificar("equipe.formada")).resolves.toBeUndefined();
+    jest.spyOn(canal, "declararFila").mockRejectedValue(new Error("Channel closed"));
+    await expect(barramento.verificar("equipe.formada")).rejects.toThrow("Channel closed");
+  });
+
   it("falha do publicador chega ao chamador", async () => {
     const canal = new CanalEmMemoria();
     jest.spyOn(canal, "publicar").mockRejectedValue(new Error("fora"));

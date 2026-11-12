@@ -1,6 +1,6 @@
-# Infraestrutura da CineBridge (ATV4): RabbitMQ + um PostgreSQL por dominio.
-# Os servicos de aplicacao sao adicionados nos passos seguintes.
-# Portas do host conforme o diagrama de implantacao.
+# CineBridge (ATV4): 4 microsservicos + RabbitMQ + um PostgreSQL por dominio, na rede cinebridge-net.
+# Portas do host conforme o diagrama de implantacao. Subir tudo: docker compose up -d --build
+# So' a infraestrutura (servicos pelo npm): docker compose up -d cinebridge-mq recomendacoes-db profissionais-db projetos-db notificacoes-db
 
 x-postgres: &postgres
   image: postgres:18-alpine
@@ -11,6 +11,21 @@ x-postgres: &postgres
     interval: 5s
     timeout: 5s
     retries: 10
+
+# Variaveis comuns aos servicos (dentro da rede do compose, bancos e broker ficam na porta padrao)
+x-mq: &mq
+  MQ_HOST: cinebridge-mq
+  MQ_PORT: "5672"
+  MQ_USER: ${MQ_USER:-guest}
+  MQ_PASSWORD: ${MQ_PASSWORD:-guest}
+  BARRAMENTO: rabbitmq
+x-credenciais-db: &credenciais-db
+  DB_USER: ${DB_USER}
+  DB_PASSWORD: ${DB_PASSWORD}
+
+x-servico: &servico
+  restart: unless-stopped
+  networks: [cinebridge-net]
 
 services:
   cinebridge-mq:
@@ -80,6 +95,100 @@ services:
       - "5435:5432"
     volumes:
       - notificacoes_pgdata:/var/lib/postgresql
+
+  cinebridge-api:
+    <<: *servico
+    build: { context: ., dockerfile: docker/api.Dockerfile }
+    image: cinebridge/api
+    container_name: cinebridge-api
+    environment:
+      <<: [*mq, *credenciais-db]
+      PORT: "3000"
+      DB_HOST: recomendacoes-db
+      DB_PORT: "5432"
+      DB_NAME: ${DB_NAME}
+      PROFISSIONAIS_VIA: mq
+    ports:
+      - "3000:3000"
+    depends_on:
+      recomendacoes-db: { condition: service_healthy }
+      cinebridge-mq: { condition: service_healthy }
+      cinebridge-profissionais: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:3000/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  cinebridge-profissionais:
+    <<: *servico
+    build: { context: ., dockerfile: docker/profissionais.Dockerfile }
+    image: cinebridge/profissionais
+    container_name: cinebridge-profissionais
+    environment:
+      <<: [*mq, *credenciais-db]
+      PROFISSIONAIS_PORT: "3001"
+      PROFISSIONAIS_DB_HOST: profissionais-db
+      PROFISSIONAIS_DB_PORT: "5432"
+      PROFISSIONAIS_DB_NAME: profissionais
+    ports:
+      - "3001:3001"
+    depends_on:
+      profissionais-db: { condition: service_healthy }
+      cinebridge-mq: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:3001/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  cinebridge-projetos:
+    <<: *servico
+    build: { context: ., dockerfile: docker/projetos.Dockerfile }
+    image: cinebridge/projetos
+    container_name: cinebridge-projetos
+    environment:
+      <<: [*mq, *credenciais-db]
+      PROJETOS_PORT: "3002"
+      PROJETOS_DB_HOST: projetos-db
+      PROJETOS_DB_PORT: "5432"
+      PROJETOS_DB_NAME: projetos
+    ports:
+      - "3002:3002"
+    depends_on:
+      projetos-db: { condition: service_healthy }
+      cinebridge-mq: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:3002/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  cinebridge-notificacoes:
+    <<: *servico
+    build: { context: ., dockerfile: docker/notificacoes.Dockerfile }
+    image: cinebridge/notificacoes
+    container_name: cinebridge-notificacoes
+    environment:
+      <<: [*mq, *credenciais-db]
+      NOTIFICACOES_PORT: "3003"
+      NOTIFICACOES_DB_HOST: notificacoes-db
+      NOTIFICACOES_DB_PORT: "5432"
+      NOTIFICACOES_DB_NAME: notificacoes
+    ports:
+      - "3003:3003"
+    depends_on:
+      notificacoes-db: { condition: service_healthy }
+      cinebridge-mq: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:3003/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
 
 networks:
   cinebridge-net:

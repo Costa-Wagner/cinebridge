@@ -63,6 +63,24 @@ describe("API", () => {
     expect(resposta.json()).toEqual({ status: "ok" });
   });
 
+  it("GET /health verifica as dependencias informadas e responde 503 listando as que falharam", async () => {
+    const servico = { decoradores: new ConfiguracaoDecoradores() } as unknown as ServicoProjetos;
+    const ok = criarApp(servico, { verificacoes: { banco: async () => 1 } });
+    expect((await ok.inject({ method: "GET", url: "/health" })).json()).toEqual({ status: "ok" });
+
+    const falha = criarApp(servico, {
+      verificacoes: {
+        banco: async () => 1,
+        rabbitmq: async () => {
+          throw new Error("canal fechado");
+        }
+      }
+    });
+    const resposta = await falha.inject({ method: "GET", url: "/health" });
+    expect(resposta.statusCode).toBe(503);
+    expect(resposta.json()).toEqual({ status: "indisponivel", falhas: { rabbitmq: "canal fechado" } });
+  });
+
   describe("POST /projetos", () => {
     it("cria o projeto: separa o tipo dos demais dados e responde 201", async () => {
       const { app, servico } = montar();
