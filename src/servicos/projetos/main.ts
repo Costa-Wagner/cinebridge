@@ -25,8 +25,8 @@ async function bootstrap(): Promise<void> {
     rabbitmq: () => canal.declararFila(FILA_EVENTOS_PROJETOS)
   });
   registrarRotasProjetos(app, gestao);
-  await app.listen({ port: Number(process.env.PORT ?? 3002), host: "0.0.0.0" });
-  console.log(`[PROJETOS] consumindo eventos da api; health e consulta na porta ${process.env.PORT ?? 3002}`);
+  await app.listen({ port: Number(process.env.PROJETOS_PORT ?? 3002), host: "0.0.0.0" });
+  console.log(`[PROJETOS] consumindo eventos da api; health e consulta na porta ${process.env.PROJETOS_PORT ?? 3002}`);
 }
 
 bootstrap().catch((erro) => {

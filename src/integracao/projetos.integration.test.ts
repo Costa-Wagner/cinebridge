@@ -4,9 +4,9 @@ import * as amqp from "amqplib";
 import { DataSource } from "typeorm";
 import { AppDataSource } from "../config/data-source";
 import { garantirBanco, prepararBancoDeTestes } from "./bancoDeTestes";
+import { BarramentoComPrefixo, esperarPor } from "./apoioMensageria";
 import { montarSistema } from "../composicao";
 import { ServicoProjetos } from "../aplicacao/ServicoProjetos";
-import { BarramentoEventos } from "../eventos/BarramentoEventos";
 import { BarramentoRabbitMQ } from "../eventos/BarramentoRabbitMQ";
 import { montarUrlMQ } from "../eventos/criarBarramento";
 import { EventoProjeto, FILA_EVENTOS_PROJETOS } from "../eventos/eventosProjeto";
@@ -19,17 +19,6 @@ import { RegistroProjeto } from "../servicos/projetos/RegistroProjeto";
 import { Papel } from "../domain/enums/Papel";
 import { TipoCaptacao } from "../domain/enums/TipoCaptacao";
 
-/** Prefixa os topicos para o teste nao competir com servicos de verdade ligados ao mesmo RabbitMQ. */
-class BarramentoComPrefixo implements BarramentoEventos {
-  constructor(private readonly interno: BarramentoEventos, private readonly prefixo: string) {}
-  publicar(topico: string, payload: unknown) {
-    return this.interno.publicar(`${this.prefixo}${topico}`, payload);
-  }
-  assinar(topico: string, tratador: (payload: any) => void | Promise<void>) {
-    return this.interno.assinar(`${this.prefixo}${topico}`, tratador);
-  }
-}
-
 const NOME_BANCO_PROJETOS = "cinebridge_test_projetos";
 const prefixo = `teste.${randomUUID()}.`;
 const url = montarUrlMQ();
@@ -39,16 +28,6 @@ let apiMQ: CanalMensageria;
 let servicoMQ: CanalMensageria;
 let servico: ServicoProjetos;
 const emitidos: EventoProjeto[] = [];
-
-async function esperarPor<T>(consulta: () => Promise<T | null | undefined | false>, limiteMs = 5000): Promise<T> {
-  const fim = Date.now() + limiteMs;
-  for (;;) {
-    const resultado = await consulta();
-    if (resultado) return resultado;
-    if (Date.now() > fim) throw new Error("Condicao nao atendida no prazo");
-    await new Promise((r) => setTimeout(r, 50));
-  }
-}
 
 const registroDe = (id: string) => dsProjetos.getRepository(RegistroProjeto).findOneBy({ id });
 const eventoDe = (tipo: string, projetoId: string) => emitidos.find((e) => e.tipo === tipo && e.projetoId === projetoId);
@@ -81,7 +60,7 @@ afterAll(async () => {
   await servicoMQ.fechar();
   const conexao = await amqp.connect(url);
   const canal = await conexao.createChannel();
-  for (const fila of ["projeto.criado", "projeto.atualizado", "equipe.formada", FILA_EVENTOS_PROJETOS]) await canal.deleteQueue(`${prefixo}${fila}`);
+  for (const fila of ["projeto.criado", "projeto.atualizado", "equipe.formada", "eventos-notificacoes", FILA_EVENTOS_PROJETOS]) await canal.deleteQueue(`${prefixo}${fila}`);
   await conexao.close();
   await dsProjetos.destroy();
   await dsApi.destroy();

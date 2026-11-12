@@ -6,6 +6,7 @@ import { FabricaDocumentario } from "./fabricas/documentario/FabricaDocumentario
 import { FabricaAnimacao } from "./fabricas/animacao/FabricaAnimacao";
 import { FabricaPublicitario } from "./fabricas/publicitario/FabricaPublicitario";
 import { IntegradorMicrosservicos } from "./observers/IntegradorMicrosservicos";
+import { PublicadorNotificacoes } from "./observers/PublicadorNotificacoes";
 import { BarramentoEmMemoria, BarramentoEventos } from "./eventos/BarramentoEventos";
 import { registrarConsumidoresExternos } from "./eventos/consumidoresExternos";
 import { TipoCaptacao } from "./domain/enums/TipoCaptacao";
@@ -17,8 +18,9 @@ import * as path from "path";
 /** Raiz de composicao: registra as fabricas e os observadores da aplicacao. */
 export function montarSistema(
   barramento: BarramentoEventos = new BarramentoEmMemoria(),
-  // com RabbitMQ os consumidores sao os outros servicos; os simulados so existem em memoria
-  registrarConsumidores: boolean = barramento instanceof BarramentoEmMemoria
+  // Modo local (barramento em memoria): e-mail, mensagens e consumidores simulados rodam dentro da api.
+  // Com RabbitMQ esses papeis sao dos outros servicos (cinebridge-notificacoes e cinebridge-projetos).
+  modoLocal: boolean = barramento instanceof BarramentoEmMemoria
 ): SistemaRecomendacao {
   const sistema = new SistemaRecomendacao();
   sistema.registrarFabrica(TipoCaptacao.DOCUMENTARIO, new FabricaDocumentario());
@@ -29,10 +31,14 @@ export function montarSistema(
     armazenamento: new AdaptadorLocal(process.env.ARMAZENAMENTO_DIR ?? path.join(os.tmpdir(), "cinebridge-midia")),
     pagamento: new AdaptadorStripe()
   });
-  sistema.adicionarObservador(new ServicoEmail());
-  sistema.adicionarObservador(new ServicoMensagensInternas());
+  if (modoLocal) {
+    sistema.adicionarObservador(new ServicoEmail());
+    sistema.adicionarObservador(new ServicoMensagensInternas());
+  } else {
+    sistema.adicionarObservador(new PublicadorNotificacoes(barramento));
+  }
   sistema.adicionarObservador(new ModuloAuditoria());
   sistema.adicionarObservador(new IntegradorMicrosservicos(barramento));
-  if (registrarConsumidores) registrarConsumidoresExternos(barramento);
+  if (modoLocal) registrarConsumidoresExternos(barramento);
   return sistema;
 }
