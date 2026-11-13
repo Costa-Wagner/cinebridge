@@ -20,6 +20,7 @@ Suporta **documentário, animação e publicitário**, cada um com a sua famíli
 - [📐 Mapeamento UML → código e premissas](#-mapeamento-uml--código-e-premissas)
 - [👥 Fluxo da equipe](#-fluxo-da-equipe)
 - [🖥 Endpoints](#-endpoints)
+- [🐳 Contêineres (ATV4)](#-contêineres-atv4)
 - [🔧 Variáveis de ambiente](#-variáveis-de-ambiente)
 - [🧪 Testes](#-testes)
 - [⚡ Desempenho](#-desempenho)
@@ -257,6 +258,19 @@ curl -X POST http://localhost:3000/convites/<conviteId>/responder -H "content-ty
 ```
 
 > Recomenda-se Thunder Client ou Insomnia para visualizar as respostas. Requisições `POST` sem corpo devem usar `No Body` (ou `{}`) — `Content-Type: application/json` com corpo vazio causa erro `415`.
+
+## 🐳 Contêineres (ATV4)
+
+A plataforma também roda como 4 microsserviços (`cinebridge-api`, `-profissionais`, `-projetos`, `-notificacoes`) com RabbitMQ e um PostgreSQL por domínio:
+
+```bash
+docker compose up -d --build     # sobe os 9 contêineres (primeira vez: alguns minutos)
+docker compose ps                # todos "healthy"
+bash scripts/verificar-stack.sh  # verificação ponta a ponta (ou: npm run verificar:stack)
+docker compose down              # para tudo
+```
+
+Portas: api 3000, profissionais 3001, projetos 3002, notificações 3003, RabbitMQ 5672 e interface web em http://localhost:15672 (guest/guest). Arquitetura, filas, decisões, diferenças em relação ao enunciado e limitações: [docs/containerizacao.md](docs/containerizacao.md).
 
 ## 🔧 Variáveis de ambiente
 
