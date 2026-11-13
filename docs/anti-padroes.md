@@ -73,5 +73,5 @@ Revisão do código das ATV1 e ATV2 em busca de más práticas que parecem solu�
 
 ```bash
 npm test                  # unitários
-docker compose up -d && npm run test:integration
+docker compose up -d recomendacoes-db cinebridge-mq && npm run test:integration
 ```

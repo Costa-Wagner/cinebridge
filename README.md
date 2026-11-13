@@ -1,6 +1,6 @@
 # 📚 DSM – Desenvolvimento de Software Multiplataforma – FATEC/SJC
 
-Atividades práticas **ATV1**, **ATV2** e **ATV3** – TP.II - Técnicas de Programação II · Prof. Dr. Eng. Gerson Penha.
+Atividades práticas **ATV1**, **ATV2**, **ATV3** e **ATV4** – TP.II - Técnicas de Programação II · Prof. Dr. Eng. Gerson Penha.
 
 # 🎬 CineBridge – Recomendação e Orquestração de Equipes
 
@@ -8,7 +8,7 @@ Microsserviço REST que recebe as especificações técnicas de um projeto audio
 
 Suporta **documentário, animação e publicitário**, cada um com a sua família de objetos (projeto, validador, recomendador e notificador). Depois da recomendação, o produtor convida os membros propostos, os profissionais respondem, e a equipe pode ser reavaliada ou ter membros substituídos; quando todos os papéis confirmam, a equipe é formada e os outros microsserviços são avisados.
 
-> Série de exercícios que incrementam este mesmo projeto ao longo do semestre. A **ATV1** aplicou padrões comportamentais (Strategy, Template Method, Observer, Visitor); a **ATV2** acrescentou os criacionais (Prototype, Abstract Factory) sobre a mesma base; a **ATV3** acrescentou os estruturais (Adapter, Composite, Decorator) e a [análise de anti-padrões](docs/anti-padroes.md). O histórico está no Git: tags `av1-entrega` e `av2-entrega`, branches `atv2` e `atv3`.
+> Série de exercícios que incrementam este mesmo projeto ao longo do semestre. A **ATV1** aplicou padrões comportamentais (Strategy, Template Method, Observer, Visitor); a **ATV2** acrescentou os criacionais (Prototype, Abstract Factory) sobre a mesma base; a **ATV3** acrescentou os estruturais (Adapter, Composite, Decorator) e a [análise de anti-padrões](docs/anti-padroes.md); a **ATV4** containerizou a plataforma em 4 microsserviços (api, profissionais, projetos e notificações) com RabbitMQ e um PostgreSQL por domínio ([docs/containerizacao.md](docs/containerizacao.md)). O histórico está no Git: tags `av1-entrega`, `av2-entrega`, `av3-entrega` e `av4-entrega`; branches `atv1`, `atv2`, `atv3` e `atv4`.
 
 ## 📑 Sumário
 
@@ -33,7 +33,7 @@ Suporta **documentário, animação e publicitário**, cada um com a sua famíli
 ## 📋 Requisitos
 
 - Node.js (versão LTS)
-- Docker Desktop com Docker Compose (o Postgres roda em container)
+- Docker Desktop (Windows) ou Docker Engine com o plugin Compose (Ubuntu): Postgres e RabbitMQ rodam em contêineres e, na ATV4, os 4 microsserviços também
 
 ## 🛠 Tecnologias
 
@@ -76,23 +76,34 @@ Suporta **documentário, animação e publicitário**, cada um com a sua famíli
 <a href="https://www.docker.com" target="_blank" rel="noopener noreferrer">
 <img src="https://img.shields.io/badge/Docker_Compose-2496ED?style=flat&logo=docker&logoColor=white" alt="Docker Compose" height="25px">
 </a>
+<a href="https://www.rabbitmq.com" target="_blank" rel="noopener noreferrer">
+<img src="https://img.shields.io/badge/RabbitMQ-FF6600?style=flat&logo=rabbitmq&logoColor=white" alt="RabbitMQ" height="25px">
+</a>
 </p>
 
-Versões: Node.js LTS · TypeScript 5.5 (modo `strict`) · Fastify 4 · TypeORM 0.3 · PostgreSQL 18 · Jest 30 + ts-jest.
+Versões: Node.js LTS (imagens `node:22-alpine`) · TypeScript 5.5 (modo `strict`) · Fastify 4 · TypeORM 0.3 · PostgreSQL 18 · RabbitMQ 3 (`amqplib` 2) · Jest 30 + ts-jest.
 
 ## 🚀 Como executar
 
-Resumo rápido (pressupõe Node.js LTS e Docker Desktop já instalados e **abertos**):
+Resumo rápido (pressupõe Node.js LTS e Docker Desktop já instalados e **abertos**). Há dois modos:
 
 ```bash
 git clone https://github.com/Costa-Wagner/cinebridge.git
 cd cinebridge
 npm install
 cp .env.example .env
-docker compose up -d
+
+# A) Desenvolvimento: a api roda pelo npm e só o banco e o RabbitMQ ficam em contêiner
+docker compose up -d recomendacoes-db cinebridge-mq
 npm run seed
 npm run dev
+
+# B) Plataforma completa da ATV4: 4 microsserviços + RabbitMQ + 4 bancos, tudo em contêiner
+docker compose up -d --build
+bash scripts/verificar-stack.sh
 ```
+
+> Não use os dois modos ao mesmo tempo: no modo B a api já ocupa a porta 3000. Para voltar ao modo A, rode `docker compose stop cinebridge-api` (ou `docker compose down`).
 
 > **Atualizando de uma versão anterior?** A imagem do banco passou de PostgreSQL 16 para 18 (o enunciado pede a versão mais recente). Os dados de um volume antigo não são reaproveitados: rode `docker compose down -v` antes do `up -d` e refaça o `npm run seed`.
 
@@ -119,13 +130,17 @@ src/
 ├── decoradores/     # Decorator: cache, auditoria, compressão e a pilha configurável
 ├── observers/       # Observer: SistemaRecomendacao (sujeito) e observadores
 ├── visitors/        # Visitor: validação, compatibilidade, relatório
-├── eventos/         # Barramento de eventos entre microsserviços (EventEmitter)
+├── eventos/         # Barramento de eventos entre microsserviços (em memória ou RabbitMQ)
+├── mensageria/      # ATV4: canal de mensageria (amqplib), cliente e servidor de RPC sobre filas
+├── servicos/        # ATV4: cinebridge-profissionais, -projetos e -notificacoes (+ comum/: health e DataSource)
 ├── integracao/      # Testes de integração (Postgres) e teste de carga
 ├── app.ts           # Rotas Fastify
 ├── composicao.ts    # Raiz de composição: fábricas + observadores
 ├── server.ts        # Entrypoint HTTP
 └── seed.ts          # Dados de exemplo
 ```
+
+Fora de `src/`: `docker/` (um Dockerfile por serviço), `scripts/verificar-stack.sh` (verificação ponta a ponta) e `docs/`.
 
 Os testes unitários (`*.test.ts`) ficam ao lado do arquivo que testam; os de integração são `*.integration.test.ts`, em `src/integracao/`.
 
@@ -239,6 +254,8 @@ recomendar ──► equipe EM_FORMACAO, membros PROPOSTOS
 | POST | `/projetos/:id/reavaliar` | Refaz os papéis não confirmados | 200, 404, 409, 422 |
 | POST | `/convites/:id/responder` | Profissional aceita ou recusa (`{"aceito": true}`) | 200, 404, 409 |
 
+Na ATV4, `GET /health` da api também verifica o banco e o RabbitMQ (503 com a lista do que falhou). Os demais serviços expõem `GET /health` (3001, 3002 e 3003), `GET /projetos` e `GET /projetos/:id` (3002) e `GET /notificacoes?projetoId=<id>` (3003).
+
 Códigos: `400` corpo fora do esquema · `404` não encontrado · `409` operação incompatível com o estado · `422` regras do tipo violadas (a resposta traz a lista `problemas`).
 
 ```bash
@@ -297,22 +314,23 @@ O `cinebridge-projetos` (`npm run servico:projetos`, porta 3002) registra o cicl
 
 O `cinebridge-notificacoes` (`npm run servico:notificacoes`, porta 3003) consome `eventos-projetos` (do `cinebridge-projetos`) e `eventos-notificacoes` (publicada pela api a cada evento de recomendação, convite ou equipe), monta os e-mails e mensagens internas, "envia" por enviadores simulados e registra cada notificação (canal, destinatário, status, origem) no `notificacoes-db`. Consulta: `GET /notificacoes` e `GET /notificacoes?projetoId=<id>`. Com `BARRAMENTO=rabbitmq` a api deixa de enviar e-mail/mensagem por conta própria (o observer `PublicadorNotificacoes` leva o evento para a fila); com `BARRAMENTO=memoria` tudo continua local, como antes.
 
-Opcionais (testes): `DB_NAME_TEST` (padrão `cinebridge_test`) e `DB_NAME_CARGA` (padrão `cinebridge_carga`). Os testes de integração e de carga criam esses bancos sozinhos e **nunca tocam no banco de desenvolvimento**. O `docker-compose.yml` lê as variáveis do `.env`.
+Opcionais (testes): `DB_NAME_TEST` (padrão `cinebridge_test`) e `DB_NAME_CARGA` (padrão `cinebridge_carga`). Os testes de integração e de carga criam esses bancos sozinhos (os da ATV4 também criam `cinebridge_test_projetos` e `cinebridge_test_notificacoes`) e **nunca tocam no banco de desenvolvimento**. O `docker-compose.yml` lê as variáveis do `.env`.
 
 ## 🧪 Testes
 
 ```bash
 npm test                  # unitários (não precisam de Docker)
 npm run test:coverage     # unitários + cobertura (mínimo de 80% configurado)
-npm run test:integration  # integração com Postgres real (exige: docker compose up -d)
+npm run test:integration  # integração com Postgres e RabbitMQ reais (exige: docker compose up -d recomendacoes-db cinebridge-mq)
 npm run carga             # teste de carga do requisito de desempenho (exige o Postgres)
 ```
 
 | Nível | Quantidade | O que cobre |
 |---|---|---|
-| Unitários | **317 testes, 31 suítes** — 100% das linhas e dos *statements*, ~96% dos ramos | Strategies, Template Method (incl. invariância do fluxo), Observer (incl. isolamento de falhas), Visitor, Prototype, fábricas, domínio do fluxo de convite, serviço, API e catálogo; Adapter (9 adaptadores), Composite (árvores de vários níveis) e Decorator (cache, auditoria, compressão e pilhas em ordens diferentes) |
-| Integração | **47 testes, 5 suítes** | Adapter: troca de armazenamento, pagamento e fonte de profissionais sem alterar o código de negócio; Composite: árvore persistida e reidratada; Decorator: cache evita recálculo, auditoria registra, pilha trocada por API. Além disso: API → serviço → Postgres: criação por tipo, equipes consistentes com o tipo, notificações por tipo, persistência e substituição da equipe, troca de strategy alterando o resultado, Visitor sobre as mesmas entidades, fluxo completo de convites até a equipe formada (com evento externo), histórico de recomendações |
+| Unitários | **426 testes, 53 suítes** — 100% das linhas e dos *statements*, ~96% dos ramos | Strategies, Template Method (incl. invariância do fluxo), Observer (incl. isolamento de falhas), Visitor, Prototype, fábricas, domínio do fluxo de convite, serviço, API e catálogo; Adapter (9 adaptadores), Composite (árvores de vários níveis) e Decorator (cache, auditoria, compressão e pilhas em ordens diferentes); ATV4: mensageria (canal AMQP com `amqplib` simulado, RPC, barramento), serviços de projetos e notificações, adaptador de profissionais por fila com projeção local e verificação de saúde |
+| Integração | **60 testes, 9 suítes** | Adapter: troca de armazenamento, pagamento e fonte de profissionais sem alterar o código de negócio; Composite: árvore persistida e reidratada; Decorator: cache evita recálculo, auditoria registra, pilha trocada por API. Além disso: API → serviço → Postgres: criação por tipo, equipes consistentes com o tipo, notificações por tipo, persistência e substituição da equipe, troca de strategy alterando o resultado, Visitor sobre as mesmas entidades, fluxo completo de convites até a equipe formada (com evento externo), histórico de recomendações; ATV4 (RabbitMQ real): RPC entre conexões, filas duráveis, cadastro remoto equivalente ao local, ciclo de vida do projeto e a cadeia api → projetos → notificações com bancos separados |
 | Carga | 1 script | 10 mil profissionais, 100 requisições simultâneas (ver [Desempenho](#-desempenho)) |
+| Verificação da stack | 1 script | `scripts/verificar-stack.sh`: fluxo completo na plataforma em contêineres (saúde, recomendação, equipe, registros e filas); veja [docs/containerizacao.md](docs/containerizacao.md) |
 
 Os testes unitários usam fakes e rodam com o Docker parado. Entidades (`domain/entities/`), `config/`, `server.ts`, `composicao.ts` e `integracao/` ficam fora do cálculo de cobertura (`jest.config.js`) por serem decorators do TypeORM, *setup* e infraestrutura de teste; a lógica que usa as entidades é coberta pelos testes de domínio e de integração.
 
@@ -357,14 +375,14 @@ Diferente dos testes Jest, esses scripts executam contra o Postgres de desenvolv
 
 | Sistema | Situação |
 |---|---|
-| Windows 10+ | Desenvolvimento e testes (unitários e de integração) |
+| Windows 10+ | Desenvolvimento e testes (unitários e de integração); ATV4: plataforma completa em contêineres com Docker Desktop |
 | Ubuntu 24.04 | ATV1 validada ponta a ponta via WSL2; na ATV2 e na ATV3, suítes unitária e de integração executadas em Ubuntu 24.04 nativo (com Postgres local) |
 
 Os adaptadores e o `AdaptadorLocal` usam apenas `path`, `os` e `fs` do Node (separadores e pasta temporária do sistema); o diretório de mídia pode ser definido por `ARMAZENAMENTO_DIR`.
 
 ## 💾 Persistência de dados
 
-PostgreSQL 18 via Docker Compose (`postgres:18-alpine`), com volume nomeado `cinebridge_pgdata` montado em `/var/lib/postgresql` (layout exigido pela imagem 18). O schema é criado pelo TypeORM (`synchronize`). `npm run seed` popula profissionais e um projeto de animação de exemplo.
+PostgreSQL 18 via Docker Compose (`postgres:18-alpine`), um contêiner por domínio (`recomendacoes-db` da api, `profissionais-db`, `projetos-db` e `notificacoes-db`), cada um com volume nomeado (`recomendacoes_pgdata` etc.) montado em `/var/lib/postgresql` (layout exigido pela imagem 18). O schema é criado pelo TypeORM (`synchronize`). `npm run seed` popula profissionais e um projeto de animação de exemplo.
 
 Tabelas principais: `projetos` (tabela única para os três tipos), `profissionais`, `competencias`, `profissional_competencias`, `avaliacoes`, `equipes`, `membros_equipe`, `convites` e `recomendacoes` (histórico).
 
@@ -372,7 +390,7 @@ Tabelas principais: `projetos` (tabela única para os três tipos), `profissiona
 
 - `Recomendacao.pontuacao` fica nula: o contrato do diagrama devolve só a ordem dos candidatos.
 - O schema usa `synchronize` (adequado para este exercício); em produção seriam migrations.
-- A comunicação entre serviços é em memória (`EventEmitter`); o barramento tem interface própria para trocar por RabbitMQ sem mudar quem publica. Gerenciamento de projetos e financeiro são consumidores simulados.
+- A comunicação entre serviços tem dois modos: em memória (`EventEmitter`, padrão, com gerenciamento de projetos e financeiro como consumidores simulados) ou RabbitMQ (`BARRAMENTO=rabbitmq`, ATV4). Na ATV4 não há serviço financeiro; as limitações da arquitetura em contêineres (mensagens descartadas em falha, entrega pelo menos uma vez, entidades compartilhadas) estão em [docs/containerizacao.md](docs/containerizacao.md#limitações-conhecidas).
 - A pré-seleção por aderência é aproximada (ver [Desempenho](#-desempenho)).
 - A auditoria é um log JSON por evento; não há tabela de auditoria.
 - Os sistemas externos (S3, Google Cloud, gateways de pagamento, LinkedIn, Indeed) são **simulados em memória**; nenhum adaptador faz chamada de rede. Provedores externos não informam nível de competência: assume-se 7.

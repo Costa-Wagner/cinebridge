@@ -46,14 +46,16 @@ Não precisa editar nada — os valores padrão já funcionam com o `docker-comp
 **Confirme que o Docker Desktop está aberto** (ícone da baleia visível e estável na bandeja) antes de rodar:
 
 ```powershell
-docker compose up -d
+docker compose up -d recomendacoes-db cinebridge-mq
 ```
+
+> Este guia roda a api pelo `npm run dev`, por isso sobe só o banco da api e o RabbitMQ. O comando `docker compose up -d` sem nomes sobe também os 4 microsserviços da ATV4 (a api ocuparia a porta 3000); a plataforma completa em contêineres está em [containerizacao.md](containerizacao.md).
 
 Confirme que subiu corretamente:
 ```powershell
 docker ps
 ```
-Deve aparecer uma linha com `recomendacoes-db` com a porta `0.0.0.0:5434->5432/tcp` (além de `profissionais-db`, `projetos-db`, `notificacoes-db` e `cinebridge-mq`). Se aparecer uma porta diferente de `5434` (tipo `51234`), o `.env` não foi criado corretamente — repita o passo 4.
+Devem aparecer `recomendacoes-db` com a porta `0.0.0.0:5434->5432/tcp` e `cinebridge-mq`. Se aparecer uma porta diferente de `5434` (tipo `51234`), o `.env` não foi criado corretamente — repita o passo 4.
 
 ### 6. Popular o banco com dados de exemplo
 
@@ -163,7 +165,7 @@ npm install
 
 ### 4. Repetir os passos 4 a 9 da seção Windows
 
-A partir daqui, os comandos são idênticos aos do Windows (`cp .env.example .env`, `docker compose up -d`, `npm run seed`, `npm run dev`, `npm test`), só que digitados no terminal Ubuntu em vez do PowerShell. Para testar a rota com um segundo terminal, abra uma nova janela do PowerShell e rode `wsl -d Ubuntu-24.04` de novo (não feche a primeira, onde o `npm run dev` está rodando).
+A partir daqui, os comandos são idênticos aos do Windows (`cp .env.example .env`, `docker compose up -d recomendacoes-db cinebridge-mq`, `npm run seed`, `npm run dev`, `npm test`), só que digitados no terminal Ubuntu em vez do PowerShell. Para testar a rota com um segundo terminal, abra uma nova janela do PowerShell e rode `wsl -d Ubuntu-24.04` de novo (não feche a primeira, onde o `npm run dev` está rodando).
 
 ---
 
@@ -172,7 +174,7 @@ A partir daqui, os comandos são idênticos aos do Windows (`cp .env.example .en
 | Sintoma | Causa provável | Solução |
 |---|---|---|
 | `docker: command not found` (dentro do Ubuntu/WSL) | Integração WSL do Docker Desktop desativada | Docker Desktop → Settings → Resources → WSL Integration → ativa o toggle da distro |
-| `docker ps` mostra uma porta aleatória em vez de `5434` | Arquivo `.env` não existe ou não foi lido pelo Docker Compose | `cp .env.example .env`, depois `docker compose down && docker compose up -d` |
+| `docker ps` mostra uma porta aleatória em vez de `5434` | Arquivo `.env` não existe ou não foi lido pelo Docker Compose | `cp .env.example .env`, depois `docker compose down && docker compose up -d recomendacoes-db cinebridge-mq` |
 | Erro `415 Unsupported Media Type` no Insomnia/Thunder Client | Corpo da requisição em branco com `Content-Type: application/json` presente | Trocar o Body para "No Body", ou digitar `{}` se essa opção não existir |
 | `curl: Failed to connect... Couldn't connect to server` | O `npm run dev` não está rodando, ou está rodando num terminal/sistema diferente do que você está testando (ex: rodou no Git Bash e testou no WSL) | Confirmar que o servidor está ativo no mesmo ambiente (Windows ou WSL) de onde você está testando |
 | `relation "projeto" does not exist` no `psql` | Nome da tabela tem case ou pluralização diferente do esperado | Rodar `\dt` no `psql` pra ver o nome real da tabela (é `projetos`, minúsculo e plural) |
