@@ -40,11 +40,15 @@ services:
       - "15672:15672"
     networks: [cinebridge-net]
     healthcheck:
-      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      # Nao use rabbitmq-diagnostics aqui: o exec roda como root e, se chegar antes de o broker criar o
+      # .erlang.cookie, cria o arquivo com dono root; o broker (usuario rabbitmq) cai com "eacces" e reinicia.
+      # A pagina inicial do gerenciamento responde sem login e so' sobe com o broker pronto.
+      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:15672/ || exit 1"]
       interval: 10s
-      timeout: 10s
-      retries: 10
-      start_period: 20s
+      timeout: 5s
+      retries: 20
+      # o broker pode levar ~1 min para subir quando a maquina esta carregada
+      start_period: 90s
 
   profissionais-db:
     <<: *postgres
@@ -119,7 +123,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-      start_period: 30s
+      start_period: 60s
 
   cinebridge-profissionais:
     <<: *servico
@@ -142,7 +146,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-      start_period: 30s
+      start_period: 60s
 
   cinebridge-projetos:
     <<: *servico
@@ -165,7 +169,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-      start_period: 30s
+      start_period: 60s
 
   cinebridge-notificacoes:
     <<: *servico
@@ -188,7 +192,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-      start_period: 30s
+      start_period: 60s
 
 networks:
   cinebridge-net:
