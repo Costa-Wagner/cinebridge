@@ -9,6 +9,7 @@ import { Papel } from "./domain/enums/Papel";
 import { Equipe } from "./domain/entities/Equipe";
 import { Profissional } from "./domain/entities/Profissional";
 import { MembroEquipe } from "./domain/entities/MembroEquipe";
+import { Verificacao, executarVerificacoes } from "./servicos/comum/health";
 
 const resumo = (p: Profissional) => ({ id: p.id, nome: p.nome });
 
@@ -88,7 +89,7 @@ const schemaResponderConvite = {
   body: { type: "object", required: ["aceito"], properties: { aceito: { type: "boolean" } } }
 };
 
-export function criarApp(servico: ServicoProjetos, opcoes: { logger?: boolean } = {}): FastifyInstance {
+export function criarApp(servico: ServicoProjetos, opcoes: { logger?: boolean; verificacoes?: Record<string, Verificacao> } = {}): FastifyInstance {
   const app = Fastify({ logger: opcoes.logger ?? false });
 
   app.setErrorHandler((erro, request, reply) => {
@@ -111,7 +112,12 @@ export function criarApp(servico: ServicoProjetos, opcoes: { logger?: boolean } 
     return reply.status(500).send({ erro: "Erro interno" });
   });
 
-  app.get("/health", async () => ({ status: "ok" }));
+  // saude: 200 so' se as dependencias informadas (banco, RabbitMQ) respondem; sem verificacoes, sempre ok
+  app.get("/health", async (_request, reply) => {
+    const falhas = await executarVerificacoes(opcoes.verificacoes ?? {});
+    if (Object.keys(falhas).length > 0) return reply.status(503).send({ status: "indisponivel", falhas });
+    return { status: "ok" };
+  });
 
   app.post<{ Body: Record<string, any> }>("/projetos", { schema: schemaCriarProjeto }, async (request, reply) => {
     const { tipoCaptacao, ...dados } = request.body;

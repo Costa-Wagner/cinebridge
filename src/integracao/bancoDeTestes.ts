@@ -7,7 +7,7 @@ import { executarSeed } from "../seed";
 const NOME_BANCO_TESTES = process.env.DB_NAME_TEST ?? "cinebridge_test";
 export const NOME_BANCO_CARGA = process.env.DB_NAME_CARGA ?? "cinebridge_carga";
 
-async function garantirBanco(nomeBanco: string): Promise<void> {
+export async function garantirBanco(nomeBanco: string): Promise<void> {
   const admin = new DataSource({ ...(AppDataSource.options as object), database: "postgres", entities: [], synchronize: false } as never);
   await admin.initialize();
   const existe = await admin.query("SELECT 1 FROM pg_database WHERE datname = $1", [nomeBanco]);

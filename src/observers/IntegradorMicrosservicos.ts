@@ -19,6 +19,9 @@ export class IntegradorMicrosservicos implements Observador {
         nome: m.profissional.nome
       }))
     };
-    this.barramento.publicar(TOPICO_EQUIPE_FORMADA, payload);
+    // com RabbitMQ a publicacao e' assincrona: uma falha nao pode interromper os demais observadores
+    Promise.resolve(this.barramento.publicar(TOPICO_EQUIPE_FORMADA, payload)).catch((erro) =>
+      console.error(`[INTEGRADOR] falha ao publicar ${TOPICO_EQUIPE_FORMADA}:`, erro)
+    );
   }
 }

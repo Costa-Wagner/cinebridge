@@ -199,6 +199,14 @@ async function seedProjeto(ds: DataSource): Promise<ProjetoAnimacao> {
   );
 }
 
+/** Semeia so' o cadastro de profissionais, e apenas se estiver vazio (usado pelo cinebridge-profissionais). */
+export async function semearProfissionaisSeVazio(ds: DataSource): Promise<boolean> {
+  const [{ total }] = await ds.query(`SELECT COUNT(*)::int AS total FROM "profissionais"`);
+  if (total > 0) return false;
+  await seedProfissionais(ds, await seedCompetencias(ds));
+  return true;
+}
+
 /** Recria os dados de exemplo no DataSource informado (ja inicializado). */
 export async function executarSeed(ds: DataSource): Promise<{ projeto: ProjetoAnimacao }> {
   await limparBanco(ds);

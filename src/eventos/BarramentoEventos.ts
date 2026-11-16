@@ -10,13 +10,13 @@ export interface EquipeFormadaPayload {
 }
 
 /**
- * Canal entre os servicos internos. Hoje em memoria (EventEmitter do Node);
- * depois pode ser trocado por RabbitMQ implementando esta interface, sem
- * mudar quem publica nem quem assina.
+ * Canal entre os servicos. Em memoria (EventEmitter do Node) ou RabbitMQ
+ * (BarramentoRabbitMQ), escolhido por BARRAMENTO, sem mudar quem publica
+ * nem quem assina.
  */
 export interface BarramentoEventos {
-  publicar(topico: string, payload: unknown): void;
-  assinar(topico: string, tratador: (payload: any) => void): void;
+  publicar(topico: string, payload: unknown): void | Promise<void>;
+  assinar(topico: string, tratador: (payload: any) => void | Promise<void>): void | Promise<void>;
 }
 
 export class BarramentoEmMemoria implements BarramentoEventos {

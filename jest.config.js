@@ -9,6 +9,7 @@ module.exports = {
     "!src/**/*.test.ts",
     "!src/config/**",
     "!src/server.ts",
+    "!src/servicos/**/main.ts",
     "!src/seed.ts",
     "!src/testar-orquestrador.ts",
     "!src/testar-visitors.ts",
