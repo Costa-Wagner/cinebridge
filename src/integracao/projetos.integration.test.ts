@@ -4,7 +4,7 @@ import * as amqp from "amqplib";
 import { DataSource } from "typeorm";
 import { AppDataSource } from "../config/data-source";
 import { garantirBanco, prepararBancoDeTestes } from "./bancoDeTestes";
-import { BarramentoComPrefixo, esperarPor } from "./apoioMensageria";
+import { BarramentoComPrefixo, esperarPor, ESPERA_BROKER } from "./apoioMensageria";
 import { montarSistema } from "../composicao";
 import { ServicoProjetos } from "../aplicacao/ServicoProjetos";
 import { BarramentoRabbitMQ } from "../eventos/BarramentoRabbitMQ";
@@ -18,6 +18,8 @@ import { ligarGestao, publicadorEventosProjetos } from "../servicos/projetos/lig
 import { RegistroProjeto } from "../servicos/projetos/RegistroProjeto";
 import { Papel } from "../domain/enums/Papel";
 import { TipoCaptacao } from "../domain/enums/TipoCaptacao";
+
+jest.setTimeout(120_000);
 
 const NOME_BANCO_PROJETOS = "cinebridge_test_projetos";
 const prefixo = `teste.${randomUUID()}.`;
@@ -43,8 +45,8 @@ beforeAll(async () => {
   await dsProjetos.initialize();
   await dsProjetos.synchronize(true);
 
-  apiMQ = await conectarAmqp(url, { tentativas: 3, intervaloMs: 500 });
-  servicoMQ = await conectarAmqp(url, { tentativas: 3, intervaloMs: 500 });
+  apiMQ = await conectarAmqp(url, ESPERA_BROKER);
+  servicoMQ = await conectarAmqp(url, ESPERA_BROKER);
   const barramentoApi = new BarramentoComPrefixo(new BarramentoRabbitMQ(apiMQ), prefixo);
   const barramentoServico = new BarramentoComPrefixo(new BarramentoRabbitMQ(servicoMQ), prefixo);
 

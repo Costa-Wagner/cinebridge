@@ -46,10 +46,10 @@ Não precisa editar nada — os valores padrão já funcionam com o `docker-comp
 **Confirme que o Docker Desktop está aberto** (ícone da baleia visível e estável na bandeja) antes de rodar:
 
 ```powershell
-docker compose up -d recomendacoes-db cinebridge-mq
+docker compose up -d --wait recomendacoes-db cinebridge-mq
 ```
 
-> Este guia roda a api pelo `npm run dev`, por isso sobe só o banco da api e o RabbitMQ. O comando `docker compose up -d` sem nomes sobe também os 4 microsserviços da ATV4 (a api ocuparia a porta 3000); a plataforma completa em contêineres está em [containerizacao.md](containerizacao.md).
+> Este guia roda a api pelo `npm run dev`, por isso sobe só o banco da api e o RabbitMQ. O `--wait` faz o comando só terminar quando os dois estão saudáveis (o RabbitMQ pode levar cerca de 1 minuto no primeiro boot). O comando `docker compose up -d` sem nomes sobe também os 4 microsserviços da ATV4 (a api ocuparia a porta 3000); a plataforma completa em contêineres está em [containerizacao.md](containerizacao.md).
 
 Confirme que subiu corretamente:
 ```powershell
@@ -165,7 +165,7 @@ npm install
 
 ### 4. Repetir os passos 4 a 9 da seção Windows
 
-A partir daqui, os comandos são idênticos aos do Windows (`cp .env.example .env`, `docker compose up -d recomendacoes-db cinebridge-mq`, `npm run seed`, `npm run dev`, `npm test`), só que digitados no terminal Ubuntu em vez do PowerShell. Para testar a rota com um segundo terminal, abra uma nova janela do PowerShell e rode `wsl -d Ubuntu-24.04` de novo (não feche a primeira, onde o `npm run dev` está rodando).
+A partir daqui, os comandos são idênticos aos do Windows (`cp .env.example .env`, `docker compose up -d --wait recomendacoes-db cinebridge-mq`, `npm run seed`, `npm run dev`, `npm test`), só que digitados no terminal Ubuntu em vez do PowerShell. Para testar a rota com um segundo terminal, abra uma nova janela do PowerShell e rode `wsl -d Ubuntu-24.04` de novo (não feche a primeira, onde o `npm run dev` está rodando).
 
 ---
 

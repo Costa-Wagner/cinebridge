@@ -102,7 +102,7 @@ npm install
 cp .env.example .env
 
 # A) Desenvolvimento: a api roda pelo npm e só o banco e o RabbitMQ ficam em contêiner
-docker compose up -d recomendacoes-db cinebridge-mq
+docker compose up -d --wait recomendacoes-db cinebridge-mq
 npm run seed
 npm run dev
 
@@ -316,7 +316,7 @@ Portas: api 3000, profissionais 3001, projetos 3002, notificações 3003, Rabbit
 | `PORT` | Porta do servidor Fastify | `3000` |
 | `DECORADORES` | Pilha de decoradores da recomendação, em ordem de aplicação (`CACHE`, `AUDITORIA`, `COMPRESSAO`; vazio = nenhum) | `CACHE` |
 
-Para rodar os serviços localmente (com `docker compose up -d` ativo), um terminal para cada: `npm run servico:profissionais`, `npm run servico:projetos`, `npm run servico:notificacoes` e a api com `BARRAMENTO=rabbitmq PROFISSIONAIS_VIA=mq npm run dev`. Cada serviço lê o próprio banco (`*_DB_*`) e a própria porta (`*_PORT`), então não é preciso sobrescrever `DB_NAME` nem `PORT`.
+Para rodar os serviços localmente, suba antes a infraestrutura com `docker compose up -d --wait cinebridge-mq recomendacoes-db profissionais-db projetos-db notificacoes-db` (o `--wait` só devolve o terminal quando tudo está saudável; o RabbitMQ leva até ~1 min no primeiro boot) e abra um terminal para cada: `npm run servico:profissionais`, `npm run servico:projetos`, `npm run servico:notificacoes` e a api com `BARRAMENTO=rabbitmq PROFISSIONAIS_VIA=mq npm run dev`. Cada serviço lê o próprio banco (`*_DB_*`) e a própria porta (`*_PORT`), então não é preciso sobrescrever `DB_NAME` nem `PORT`.
 
 O `cinebridge-projetos` (`npm run servico:projetos`, porta 3002) registra o ciclo de vida dos projetos a partir dos eventos `projeto.criado`, `projeto.atualizado` e `equipe.formada` da api, publica `PROJETO_CRIADO|ATUALIZADO|FINALIZADO` na fila `eventos-projetos` e expõe `GET /projetos` e `GET /projetos/:id` (somente leitura). Para a api publicar esses eventos, use `BARRAMENTO=rabbitmq`.
 
@@ -329,7 +329,7 @@ Opcionais (testes): `DB_NAME_TEST` (padrão `cinebridge_test`) e `DB_NAME_CARGA`
 ```bash
 npm test                  # unitários (não precisam de Docker)
 npm run test:coverage     # unitários + cobertura (mínimo de 80% configurado)
-npm run test:integration  # integração com Postgres e RabbitMQ reais (exige: docker compose up -d recomendacoes-db cinebridge-mq)
+npm run test:integration  # integração com Postgres e RabbitMQ reais (exige: docker compose up -d --wait recomendacoes-db cinebridge-mq)
 npm run carga             # teste de carga do requisito de desempenho (exige o Postgres)
 ```
 
@@ -377,14 +377,14 @@ npm run test:orquestrador  # Strategy + Template Method + Observer, ponta a pont
 npm run test:visitors      # Visitor, percorrendo projeto + profissionais seedados
 ```
 
-Diferente dos testes Jest, esses scripts executam contra o Postgres de desenvolvimento — exigem `docker compose up -d` e `npm run seed`.
+Diferente dos testes Jest, esses scripts executam contra o Postgres de desenvolvimento — exigem `docker compose up -d --wait recomendacoes-db cinebridge-mq` e `npm run seed`.
 
 ## 🖥 Compatibilidade
 
 | Sistema | Situação |
 |---|---|
 | Windows 10+ | Desenvolvimento e testes (unitários e de integração); ATV4: plataforma completa em contêineres com Docker Desktop |
-| Ubuntu 24.04 | ATV1 validada ponta a ponta via WSL2; na ATV2 e na ATV3, suítes unitária e de integração executadas em Ubuntu 24.04 nativo (com Postgres local) |
+| Ubuntu 24.04 | ATV1 validada ponta a ponta via WSL2; na ATV2 e na ATV3, suítes unitária e de integração executadas em Ubuntu 24.04 nativo (com Postgres local); na ATV4, validada em Ubuntu 24.04 (WSL2 com Docker Desktop): plataforma completa em contêineres (9 contêineres `healthy` e `scripts/verificar-stack.sh` sem falhas), 426 testes unitários e 60 de integração sem falhas |
 
 Os adaptadores e o `AdaptadorLocal` usam apenas `path`, `os` e `fs` do Node (separadores e pasta temporária do sistema); o diretório de mídia pode ser definido por `ARMAZENAMENTO_DIR`.
 

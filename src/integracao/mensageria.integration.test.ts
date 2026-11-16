@@ -1,12 +1,15 @@
 import "dotenv/config";
 import { randomUUID } from "crypto";
 import * as amqp from "amqplib";
+import { ESPERA_BROKER } from "./apoioMensageria";
 import { conectarAmqp } from "../mensageria/CanalAmqp";
 import { CanalMensageria } from "../mensageria/CanalMensageria";
 import { ClienteRPC, ErroRPC, TimeoutRPCError } from "../mensageria/ClienteRPC";
 import { registrarRespondedor } from "../mensageria/ResponderRPC";
 import { BarramentoRabbitMQ } from "../eventos/BarramentoRabbitMQ";
 import { montarUrlMQ } from "../eventos/criarBarramento";
+
+jest.setTimeout(120_000);
 
 /** Exige o RabbitMQ do docker-compose (cinebridge-mq). Duas conexoes simulam dois servicos distintos. */
 describe("Mensageria com RabbitMQ real", () => {
@@ -22,8 +25,8 @@ describe("Mensageria com RabbitMQ real", () => {
   };
 
   beforeAll(async () => {
-    servidor = await conectarAmqp(url, { tentativas: 3, intervaloMs: 500 });
-    cliente = await conectarAmqp(url, { tentativas: 3, intervaloMs: 500 });
+    servidor = await conectarAmqp(url, ESPERA_BROKER);
+    cliente = await conectarAmqp(url, ESPERA_BROKER);
   });
 
   afterAll(async () => {

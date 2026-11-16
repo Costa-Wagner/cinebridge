@@ -1,6 +1,6 @@
 # CineBridge (ATV4): 4 microsservicos + RabbitMQ + um PostgreSQL por dominio, na rede cinebridge-net.
 # Portas do host conforme o diagrama de implantacao. Subir tudo: docker compose up -d --build
-# So' a infraestrutura (servicos pelo npm): docker compose up -d cinebridge-mq recomendacoes-db profissionais-db projetos-db notificacoes-db
+# So' a infraestrutura (servicos pelo npm): docker compose up -d --wait cinebridge-mq recomendacoes-db profissionais-db projetos-db notificacoes-db
 
 x-postgres: &postgres
   image: postgres:18-alpine

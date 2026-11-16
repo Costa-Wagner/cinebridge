@@ -4,7 +4,7 @@ import * as amqp from "amqplib";
 import { DataSource } from "typeorm";
 import { AppDataSource } from "../config/data-source";
 import { garantirBanco, prepararBancoDeTestes } from "./bancoDeTestes";
-import { BarramentoComPrefixo, esperarPor } from "./apoioMensageria";
+import { BarramentoComPrefixo, esperarPor, ESPERA_BROKER } from "./apoioMensageria";
 import { montarSistema } from "../composicao";
 import { ServicoProjetos } from "../aplicacao/ServicoProjetos";
 import { BarramentoRabbitMQ } from "../eventos/BarramentoRabbitMQ";
@@ -24,6 +24,8 @@ import { EnviadorEmailSimulado, EnviadorMensagemInternaSimulado } from "../servi
 import { ligarNotificacoes } from "../servicos/notificacoes/ligarNotificacoes";
 import { Papel } from "../domain/enums/Papel";
 import { TipoCaptacao } from "../domain/enums/TipoCaptacao";
+
+jest.setTimeout(120_000);
 
 /**
  * Cadeia completa com tres processos simulados por tres conexoes ao RabbitMQ e bancos separados:
@@ -62,7 +64,7 @@ beforeAll(async () => {
   dsProjetos = await dataSourceNoMesmoServidor(criarDataSourceProjetos, BANCOS.projetos);
   dsNotificacoes = await dataSourceNoMesmoServidor(criarDataSourceNotificacoes, BANCOS.notificacoes);
 
-  const [apiMQ, projetosMQ, notificacoesMQ] = await Promise.all([1, 2, 3].map(() => conectarAmqp(url, { tentativas: 3, intervaloMs: 500 })));
+  const [apiMQ, projetosMQ, notificacoesMQ] = await Promise.all([1, 2, 3].map(() => conectarAmqp(url, ESPERA_BROKER)));
   canais = [apiMQ, projetosMQ, notificacoesMQ];
   const barramento = (canal: CanalMensageria) => new BarramentoComPrefixo(new BarramentoRabbitMQ(canal), prefixo);
 

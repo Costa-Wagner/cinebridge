@@ -12,6 +12,7 @@ import { AdaptadorProfissionalComProjecao } from "../adaptadores/profissional/Ad
 import { AdaptadorProfissional, AvaliacaoInvalidaError } from "../adaptadores/profissional/AdaptadorProfissional";
 import { criarProfissionalExterno } from "../adaptadores/profissional/profissionalExterno";
 import { criarTratadorConsultas } from "../servicos/profissionais/tratadorConsultas";
+import { ESPERA_BROKER } from "./apoioMensageria";
 import { conectarAmqp } from "../mensageria/CanalAmqp";
 import { CanalMensageria } from "../mensageria/CanalMensageria";
 import { ClienteRPC } from "../mensageria/ClienteRPC";
@@ -19,6 +20,8 @@ import { registrarRespondedor } from "../mensageria/ResponderRPC";
 import { montarUrlMQ } from "../eventos/criarBarramento";
 import { Papel } from "../domain/enums/Papel";
 import { Profissional } from "../domain/entities/Profissional";
+
+jest.setTimeout(120_000);
 
 /**
  * Cadastro remoto: a api consulta o servico de profissionais por fila. Duas conexoes ao RabbitMQ simulam
@@ -50,8 +53,8 @@ beforeAll(async () => {
   const banco = await prepararBancoDeTestes();
   ds = banco.ds;
   projetoSeedId = banco.projetoSeedId;
-  servidor = await conectarAmqp(url, { tentativas: 3, intervaloMs: 500 });
-  cliente = await conectarAmqp(url, { tentativas: 3, intervaloMs: 500 });
+  servidor = await conectarAmqp(url, ESPERA_BROKER);
+  cliente = await conectarAmqp(url, ESPERA_BROKER);
   remotoReal = new AdaptadorInterno(new CatalogoProfissionais(ds), ds);
   const fila = novaFila();
   await registrarRespondedor(servidor, fila, criarTratadorConsultas(remotoReal));

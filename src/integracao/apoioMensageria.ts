@@ -1,5 +1,8 @@
 import { BarramentoEventos } from "../eventos/BarramentoEventos";
 
+/** O RabbitMQ pode levar ~1 min para aceitar conexoes logo depois do `docker compose up`: os testes esperam por ele. */
+export const ESPERA_BROKER = { tentativas: 40, intervaloMs: 2000 };
+
 /** Prefixa os topicos para o teste nao competir com servicos de verdade ligados ao mesmo RabbitMQ. */
 export class BarramentoComPrefixo implements BarramentoEventos {
   constructor(private readonly interno: BarramentoEventos, private readonly prefixo: string) {}

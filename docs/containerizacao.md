@@ -64,7 +64,7 @@ docker compose down -v           # idem, apagando também os dados
 
 A primeira construção leva alguns minutos. Os serviços esperam o próprio banco e o RabbitMQ ficarem saudáveis (`depends_on` com `service_healthy`); a api espera também o serviço de profissionais. O serviço de profissionais cria o cadastro inicial sozinho se o banco estiver vazio.
 
-Para rodar só a infraestrutura e os serviços pelo `npm` (desenvolvimento), veja o README: `docker compose up -d cinebridge-mq recomendacoes-db profissionais-db projetos-db notificacoes-db`, depois `npm run servico:profissionais`, `npm run servico:projetos`, `npm run servico:notificacoes` e `BARRAMENTO=rabbitmq PROFISSIONAIS_VIA=mq npm run dev`.
+Para rodar só a infraestrutura e os serviços pelo `npm` (desenvolvimento), veja o README: `docker compose up -d --wait cinebridge-mq recomendacoes-db profissionais-db projetos-db notificacoes-db`, depois `npm run servico:profissionais`, `npm run servico:projetos`, `npm run servico:notificacoes` e `BARRAMENTO=rabbitmq PROFISSIONAIS_VIA=mq npm run dev`.
 
 ## Health checks
 
@@ -88,6 +88,7 @@ A interface do RabbitMQ fica em `http://localhost:15672` (usuário e senha `gues
 - **Dois modos de execução.** `BARRAMENTO=memoria` (padrão) mantém tudo dentro de um processo, como nas atividades anteriores; `BARRAMENTO=rabbitmq` e `PROFISSIONAIS_VIA=mq` ligam a arquitetura distribuída. Os testes unitários e de integração anteriores seguem valendo nos dois modos.
 - **Um banco por serviço.** Projetos e notificações têm banco e entidade próprios. O serviço de profissionais reaproveita as entidades da api.
 - **Projeção local de profissionais.** Convites, recomendações e equipes da api referenciam profissionais por chave estrangeira, e chave estrangeira não atravessa bancos. A cada consulta ao serviço de profissionais, a api grava o profissional numa tabela local (upsert) e anexa os convites do histórico, que a filtragem colaborativa usa. O dono do cadastro continua sendo o serviço de profissionais.
+- **Health check do RabbitMQ.** A checagem usa a página inicial do gerenciamento (`wget` na porta 15672), não o `rabbitmq-diagnostics`. O `docker exec` roda como root e, se a checagem chegasse antes de o broker criar o `.erlang.cookie`, o arquivo ficava com dono root e o broker (usuário `rabbitmq`) caía com `eacces` e reiniciava. Isso apareceu em uma execução em Ubuntu/WSL2 e deixava `docker compose up` falhar de forma intermitente.
 - **Imagens.** Dockerfiles multi-stage em `node:22-alpine`: compila com `tsc` e a imagem final leva só dependências de produção e o JavaScript compilado, rodando como usuário não-root. Os quatro diferem apenas na porta e no comando de inicialização.
 
 ## Diferenças em relação ao enunciado
@@ -107,9 +108,11 @@ A interface do RabbitMQ fica em `http://localhost:15672` (usuário e senha `gues
 - Não há serviço financeiro: o evento `equipe.formada` é consumido só pelo serviço de projetos. Em modo local o consumidor financeiro continua simulado.
 - Os sistemas externos dos adaptadores (armazenamento, pagamento, cadastro profissional) continuam simulados.
 - Banco criado por `synchronize` e credenciais `guest` e do `.env`: adequado para desenvolvimento e avaliação, não para produção.
+- Os nomes dos contêineres são fixos (`container_name`, como no diagrama): só uma cópia da stack pode existir por vez. Windows e WSL compartilham o mesmo Docker Desktop, então é preciso `docker compose down` em um antes de subir no outro.
+- No primeiro boot o RabbitMQ pode levar cerca de 1 minuto. Os comandos documentados usam `--wait`, e os testes de integração esperam o broker.
 - O teste de carga (`npm run carga`) depende do processador da máquina (limite de 2 s de p95).
 - As imagens foram preparadas para Docker; Podman e nerdctl não foram testados.
 
 ## Compatibilidade
 
-Windows 10 ou superior (Docker Desktop) e Ubuntu 24.04 ou superior e derivados (Docker Engine com Compose). O script de verificação usa `bash`, `curl` e `node`; no Windows, rode-o pelo Git Bash. O `.gitattributes` mantém os scripts e Dockerfiles com fim de linha LF.
+Windows 10 ou superior (Docker Desktop) e Ubuntu 24.04 ou superior e derivados (Docker Engine com Compose). A plataforma completa foi validada no Windows 10+ (Docker Desktop) e no Ubuntu 24.04 (WSL2 com Docker Desktop): os 9 contêineres ficam `healthy`, `scripts/verificar-stack.sh` passa sem falhas e as suítes unitária (426 testes) e de integração (60 testes) passam. Docker Engine nativo em Ubuntu não foi exercitado. O script de verificação usa `bash`, `curl` e `node`; no Windows, rode-o pelo Git Bash. O `.gitattributes` mantém os scripts e Dockerfiles com fim de linha LF.
