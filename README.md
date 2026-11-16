@@ -8,7 +8,15 @@ Microsserviço REST que recebe as especificações técnicas de um projeto audio
 
 Suporta **documentário, animação e publicitário**, cada um com a sua família de objetos (projeto, validador, recomendador e notificador). Depois da recomendação, o produtor convida os membros propostos, os profissionais respondem, e a equipe pode ser reavaliada ou ter membros substituídos; quando todos os papéis confirmam, a equipe é formada e os outros microsserviços são avisados.
 
-> Série de exercícios que incrementam este mesmo projeto ao longo do semestre. A **ATV1** aplicou padrões comportamentais (Strategy, Template Method, Observer, Visitor); a **ATV2** acrescentou os criacionais (Prototype, Abstract Factory) sobre a mesma base; a **ATV3** acrescentou os estruturais (Adapter, Composite, Decorator) e a [análise de anti-padrões](docs/anti-padroes.md); a **ATV4** containerizou a plataforma em 4 microsserviços (api, profissionais, projetos e notificações) com RabbitMQ e um PostgreSQL por domínio ([docs/containerizacao.md](docs/containerizacao.md)). O histórico está no Git: tags `av1-entrega`, `av2-entrega`, `av3-entrega` e `av4-entrega`; branches `atv1`, `atv2`, `atv3` e `atv4`.
+> Série de exercícios que incrementam este mesmo projeto ao longo do semestre. <br>
+> **ATV1** aplicou padrões comportamentais (Strategy, Template Method, Observer, Visitor);<br>
+> **ATV2** acrescentou os criacionais (Prototype, Abstract Factory) sobre a mesma base;<br>
+> **ATV3** acrescentou os estruturais (Adapter, Composite, Decorator) e a [análise de anti-padrões](docs/anti-padroes.md);<br>
+> **ATV4** containerizou a plataforma em 4 microsserviços (api, profissionais, projetos e notificações) com RabbitMQ e um PostgreSQL por domínio ([docs/containerizacao.md](docs/containerizacao.md)).<br>
+
+> O histórico está no Git:
+>   - tags `av1-entrega`, `av2-entrega`, `av3-entrega` e `av4-entrega`;
+>   - branches `atv1`, `atv2`, `atv3` e `atv4`.
 
 ## 📑 Sumário
 
